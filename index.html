@@ -1,0 +1,2834 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIGC 視覺設計實戰教材｜3D 數位學習島嶼</title>
+  <!-- Tailwind CSS -->
+  <script src="./vendor/tailwind.js"></script>
+  <!-- Three.js r128 -->
+  <script src="./vendor/three.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="./vendor/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              900: '#1e1b4b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #070b19;
+      font-family: 'Noto Sans TC', 'Inter', sans-serif;
+      user-select: none;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Glassmorphism Utilities */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .glass-pill {
+      background: rgba(30, 41, 59, 0.78);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-pill:hover {
+      background: rgba(51, 65, 85, 0.92);
+      border-color: rgba(129, 140, 248, 0.6);
+      transform: translateY(-2px);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.8);
+    }
+
+    /* Floating 3D Island Pin Labels */
+    .island-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      z-index: 10;
+    }
+    .island-label:hover {
+      transform: translate(-50%, -108%) scale(1.08);
+      z-index: 20;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.12); opacity: 0.35; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+    .animate-pulse-slow {
+      animation: pulse-ring 3s infinite ease-in-out;
+    }
+  </style>
+<meta name="theme-color" content="#070b19"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./assets/icon-192.png"><link rel="icon" href="./assets/icon-192.png"><link rel="stylesheet" href="./assets/enhance.css">
+</head>
+<body class="text-slate-100 antialiased">
+
+  <!-- 3D Three.js Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Dynamic HTML 3D Labels Overlay -->
+  <div id="labels-container" class="fixed inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+  <!-- Top Navigation & Learning Passport HUD -->
+  <header class="fixed top-0 left-0 right-0 z-30 p-3 md:p-5 pointer-events-none flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+    <!-- Brand & Course Title -->
+    <div class="glass-panel rounded-2xl px-4 py-3 pointer-events-auto flex items-center gap-3.5 border-l-4 border-l-indigo-500">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+        <i class="fa-solid fa-cubes-stacked text-white text-xl"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">全三冊互動教材</span>
+          <span class="text-xs text-slate-400 hidden sm:inline">單元 1-1 ～ 9-2</span>
+        </div>
+        <h1 class="text-base md:text-lg font-black tracking-tight bg-gradient-to-r from-white via-indigo-100 to-indigo-300 bg-clip-text text-transparent">
+          AIGC 視覺設計實戰：3D 數位學習島嶼
+        </h1>
+      </div>
+    </div>
+
+    <!-- Top Right Controls & Student Progress -->
+    <div class="flex flex-wrap items-center gap-2.5 pointer-events-auto w-full md:w-auto justify-between md:justify-end">
+      <!-- Progress & XP Pill -->
+      <div class="glass-panel rounded-2xl px-4 py-2.5 flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+            <i class="fa-solid fa-star text-sm"></i>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-semibold">學習積分 XP</div>
+            <div id="xp-counter" class="text-sm font-black text-amber-300">0 XP</div>
+          </div>
+        </div>
+        <div class="h-7 w-px bg-slate-700/80"></div>
+        <div>
+          <div class="flex items-center justify-between text-[11px] mb-1 gap-2">
+            <span class="text-slate-300 font-semibold">島嶼解鎖進度</span>
+            <span id="mastery-counter" class="text-emerald-400 font-bold">0 / 9 島</span>
+          </div>
+          <div class="w-28 sm:w-36 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+            <div id="mastery-bar" class="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera & Global Tool Buttons -->
+<button onclick="openPassport()" class="glass-pill px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-indigo-200" aria-label="開啟學習護照與設定"><i class="fa-solid fa-address-book mr-1"></i>學習護照</button>
+      <div class="flex items-center gap-2">
+        <button id="btn-auto-tour" onclick="toggleAutoTour()" class="glass-pill px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 text-cyan-300 border-cyan-500/30">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span id="tour-btn-text">環島巡航</span>
+        </button>
+        <button onclick="resetCameraOverview()" class="glass-pill px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 text-slate-200" title="回到全島鳥瞰視角">
+          <i class="fa-solid fa-compass"></i>
+          <span class="hidden sm:inline">全島鳥瞰</span>
+        </button>
+        <button onclick="openGlobalLabModal()" class="glass-pill px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white border-indigo-400/50 shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>AIGC 實戰工坊</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Helper Tip Banner (Bottom Left or Top Center) -->
+  <div id="helper-tip" class="fixed top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-500 hidden md:flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/75 border border-slate-700/80 text-xs text-slate-300 backdrop-blur-md shadow-lg">
+    <i class="fa-solid fa-hand-pointer text-indigo-400 animate-bounce"></i>
+    <span>拖曳滑鼠旋轉視角・滾輪縮放・點擊任一 <strong>3D 島嶼</strong> 或下方導覽列開始互動學習！</span>
+  </div>
+
+  <!-- Bottom Archipelago Dock Navigation -->
+  <nav class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 w-[96vw] max-w-6xl pointer-events-auto">
+    <div class="glass-panel rounded-2xl p-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <div class="px-2.5 py-1 text-[11px] font-bold text-slate-400 shrink-0 hidden lg:block">
+        <i class="fa-solid fa-map-location-dot mr-1 text-indigo-400"></i>九大島嶼導覽
+      </div>
+      <div id="dock-buttons" class="flex items-center gap-1.5 w-full justify-start lg:justify-between">
+        <!-- Populated dynamically by JS -->
+      </div>
+    </div>
+  </nav>
+
+  <!-- Right Slide-Over Deep-Dive Learning Drawer -->
+  <aside id="island-drawer" class="fixed top-0 right-0 bottom-0 z-40 w-full md:w-[600px] lg:w-[680px] glass-panel border-l border-slate-700/80 transform translate-x-full transition-transform duration-500 ease-out flex flex-col pointer-events-auto">
+    <!-- Drawer Header -->
+    <div id="drawer-header" class="p-4 sm:p-6 border-b border-slate-700/70 bg-gradient-to-r from-slate-900/90 via-indigo-950/60 to-slate-900/90 shrink-0">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div id="drawer-icon-box" class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-lg shrink-0">
+            <i id="drawer-icon" class="fa-solid fa-robot"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="drawer-book-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">第一冊</span>
+              <span id="drawer-unit-range" class="text-xs font-semibold text-cyan-300">單元 1-1 & 1-2</span>
+              <span id="drawer-status-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">未闖關</span>
+            </div>
+            <h2 id="drawer-title" class="text-xl sm:text-2xl font-black text-white mt-0.5">第一島：協作與倫理之島</h2>
+          </div>
+        </div>
+        <button onclick="closeIslandDrawer()" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors shrink-0" title="關閉面板">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Mode Tabs inside Drawer -->
+      <div class="grid grid-cols-4 gap-1.5 mt-5 bg-slate-950/70 p-1.5 rounded-xl border border-slate-800">
+        <button onclick="switchDrawerTab('learn')" id="tab-btn-learn" class="drawer-tab-btn py-2 px-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all bg-indigo-600 text-white shadow">
+          <i class="fa-solid fa-book-open"></i><span>核心教材</span>
+        </button>
+        <button onclick="switchDrawerTab('compare')" id="tab-btn-compare" class="drawer-tab-btn py-2 px-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:text-white">
+          <i class="fa-solid fa-scale-balanced"></i><span>優劣對照</span>
+        </button>
+        <button onclick="switchDrawerTab('lab')" id="tab-btn-lab" class="drawer-tab-btn py-2 px-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:text-white">
+          <i class="fa-solid fa-flask"></i><span>實戰演練</span>
+        </button>
+        <button onclick="switchDrawerTab('quiz')" id="tab-btn-quiz" class="drawer-tab-btn py-2 px-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:text-white">
+          <i class="fa-solid fa-trophy"></i><span>闖關測驗</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Drawer Scrollable Body -->
+    <div id="drawer-body" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+      <!-- Content injected dynamically by JS -->
+    </div>
+
+    <!-- Drawer Footer Navigation (Prev / Next Island) -->
+    <div class="p-3.5 sm:px-6 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between shrink-0">
+      <button id="btn-prev-island" onclick="navigateRelativeIsland(-1)" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2 transition-colors">
+        <i class="fa-solid fa-arrow-left"></i><span>上一座島嶼</span>
+      </button>
+      <span id="drawer-footer-indicator" class="text-xs font-bold text-slate-400">島嶼 1 / 9</span>
+      <button id="btn-next-island" onclick="navigateRelativeIsland(1)" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs sm:text-sm font-bold text-white flex items-center gap-2 transition-colors shadow-lg shadow-indigo-600/30">
+        <span>下一座島嶼</span><i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Global Interactive Workshop Modal (3-in-1 Sandbox) -->
+  <div id="global-lab-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-3 sm:p-6 pointer-events-auto">
+    <div class="glass-panel rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-indigo-500/40 shadow-2xl">
+      <!-- Modal Header -->
+      <div class="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/80">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white shadow">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <div>
+            <h3 class="text-lg sm:text-xl font-black text-white">AIGC 視覺設計互動實戰工坊</h3>
+            <p class="text-xs text-slate-300">結合第一冊至第三冊核心技能：提示詞工程 × 圖表選型決策 × 完稿品質檢查</p>
+          </div>
+        </div>
+        <button onclick="closeGlobalLabModal()" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Lab Selector Tabs -->
+      <div class="flex border-b border-slate-800 bg-slate-900/90 px-4 pt-3 gap-2 overflow-x-auto">
+        <button onclick="switchGlobalLabTab('prompt')" id="glab-tab-prompt" class="px-4 py-2.5 rounded-t-xl font-bold text-xs sm:text-sm border-b-2 border-indigo-400 text-indigo-300 bg-slate-800/80 flex items-center gap-2 shrink-0">
+          <i class="fa-solid fa-terminal"></i>1. AI 提示詞與腳本組裝器 (單元 1-1 / 6-2 / 9-1)
+        </button>
+        <button onclick="switchGlobalLabTab('chart')" id="glab-tab-chart" class="px-4 py-2.5 rounded-t-xl font-bold text-xs sm:text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 shrink-0">
+          <i class="fa-solid fa-chart-pie"></i>2. 資訊圖表選型決策樹 (單元 4-1 / 5-1)
+        </button>
+        <button onclick="switchGlobalLabTab('inspector')" id="glab-tab-inspector" class="px-4 py-2.5 rounded-t-xl font-bold text-xs sm:text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 shrink-0">
+          <i class="fa-solid fa-magnifying-glass-chart"></i>3. 圖卡完稿診斷與修訂室 (單元 5-2 / 6-1 / 9-2)
+        </button>
+      </div>
+
+      <!-- Lab Content Container -->
+      <div id="global-lab-body" class="p-4 sm:p-6 overflow-y-auto flex-1">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-box" class="fixed top-20 right-5 z-50 transform translate-x-[150%] transition-transform duration-300 pointer-events-none">
+    <div class="glass-panel px-4 py-3 rounded-2xl border-l-4 border-l-emerald-400 flex items-center gap-3 shadow-2xl">
+      <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
+        <i id="toast-icon" class="fa-solid fa-check"></i>
+      </div>
+      <div>
+        <div id="toast-title" class="text-xs font-black text-white">獲得學習積分！</div>
+        <div id="toast-desc" class="text-[11px] text-slate-300">+100 XP</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Data & Logic -->
+  <script>
+    /********************************************************************
+     * 1. COURSE CURRICULUM DATA (All 9 Islands / Units 1-1 to 9-2)
+     ********************************************************************/
+    const ISLANDS_DATA = [
+      {
+        id: 1,
+        name: "協作與倫理之島",
+        book: "第一冊",
+        unitRange: "單元 1-1 & 1-2",
+        shortTitle: "1. 協作與倫理",
+        color: "#06b6d4", // Cyan
+        accentClass: "from-cyan-500 to-blue-600",
+        icon: "fa-robot",
+        position: { x: -38, y: 0, z: 26 },
+        labType: "prompt",
+        subUnits: [
+          {
+            code: "單元 1-1",
+            title: "AIGC 乘上視覺設計：角色、步驟與基礎應用",
+            coreEssence: "從隨機生成到精準協作：AIGC 是隨時待命的「設計助理」，負責加速嘗試；人類負責判斷、選擇與完成。",
+            memoryHook: "AI 幫你加速發想與起草，人負責最後的美學選擇與邏輯把關！",
+            flashcards: [
+              {
+                tag: "01 角色定位",
+                title: "AIGC 在視覺設計扮演什麼角色？",
+                points: [
+                  "AIGC 是利用 AI 生成內容的工具，猶如「設計助理」。",
+                  "協助發想、摘要、圖像生成、版面建議與風格探索。",
+                  "核心價值是加快嘗試與修正速度，而非取代設計者。"
+                ]
+              },
+              {
+                tag: "02 介入流程",
+                title: "前、中、後三階段介入路徑",
+                points: [
+                  "【前期】蒐集靈感、釐清主題、了解不同受眾語氣（學生/老師/家長）。",
+                  "【中期】摘要長篇資料、生成構圖草案、探索極簡/手繪/科技等風格。",
+                  "【後期】提供海報或簡報版面建議、優化文案、快速微調修正。"
+                ]
+              },
+              {
+                tag: "03 提示詞公式",
+                title: "寫出好提示詞（Prompt）的五大要素",
+                points: [
+                  "1. 目的（想達成什麼效果？）＋ 2. 對象（給誰看？）",
+                  "3. 風格（什麼畫面感？）＋ 4. 限制（字數、色彩或禁忌）",
+                  "5. 格式（海報、圖卡或簡報），並以「請列出 5 種方案」擴展多樣性。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 1-2",
+            title: "建立 AI 使用規範：版權、查核與隱私安全",
+            coreEssence: "先想「能不能用、該不該用、要不要標示」，建立保護權利、查證幻覺與誠實揭露的負責任態度。",
+            memoryHook: "先查、再用、後修正！越重要的資訊越要交叉查證，誠實標示更專業。",
+            flashcards: [
+              {
+                tag: "01 著作權與隱私",
+                title: "版權合規與個資保護紅線",
+                points: [
+                  "檢查 AI 生成內容的授權條款，商用前務必再次確認使用條件。",
+                  "不擅自複製或模仿他人受保護的角色與畫風。",
+                  "不輸入學號、住址、病歷等敏感個資；上傳他人照片前須取得同意，或先匿名化處理。"
+                ]
+              },
+              {
+                tag: "02 真實性查核",
+                title: "對抗 AI「幻覺（Hallucination）」",
+                points: [
+                  "AI 可能捏造看似合理的假資訊或假引用。",
+                  "重要資訊至少交叉查證「兩個以上」獨立且可靠的來源。",
+                  "優先查核政府官方、學術機構或原始出處資料；特別核對日期、數據與專有名詞。"
+                ]
+              },
+              {
+                tag: "03 揭露與四步驟",
+                title: "AI 使用四步驟與透明揭露",
+                points: [
+                  "四步驟：① 明確任務與需求 ➔ ② 避免提供個資與機密 ➔ ③ 驗證資料真實性 ➔ ④ 補上引用並人工修訂。",
+                  "主動說明 AI 參與階段（發想/改寫/製圖）並標示「已人工查核」，不扣分反而贏得信任！",
+                  "留意訓練資料可能帶有的性別、族群或文化刻板印象，發現偏誤立即修正。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "人機協作與產出態度",
+            good: "將 AI 視為靈感發電機，產出多組草稿後由設計師親自篩選、查證事實並微調細節。",
+            bad: "對 AI 自動化產出照單全收，直接複製貼上未經查證的數據或帶有透視缺陷的圖片。"
+          },
+          {
+            aspect: "提示詞（Prompt）下達方式",
+            good: "清楚指定「目的、受眾、風格、格式與限制」，並透過多輪追問逐步收斂。",
+            bad: "只輸入「幫我做一張好看的海報」等籠統指令，導致生成結果空泛無用。"
+          },
+          {
+            aspect: "學術誠信與隱私保護",
+            good: "先將訪談名單匿名化再交由 AI 整理，並在作品角落誠實標註 AI 工具用途與資料出處。",
+            bad: "將同學真實姓名、電話與照片直接上傳公開 AI，且把 AI 代寫內容當成個人原創。"
+          }
+        ],
+        quiz: [
+          {
+            q: "當使用 AI 協助整理專題報告的統計數據時，為了避免 AI「幻覺（捏造事實）」，下列哪一種做法最正確？",
+            options: [
+              "看 AI 語氣非常肯定且格式整齊，就可以直接放進圖卡發布",
+              "對關鍵數字與專有名詞，至少交叉比對兩個以上獨立可靠的官方或學術原始資料",
+              "只要請 AI 再重新生成一次，兩次結果差不多就代表絕對正確",
+              "在圖卡下方標註「網路資料」四個字即可免責"
+            ],
+            ans: 1,
+            exp: "教材 1-2 強調：AI 可能產生看似合理的「幻覺」，關鍵數據、日期與專有名詞必須交叉查證至少兩個獨立可靠來源（優先官方、學術、原始資料）。"
+          },
+          {
+            q: "下列哪一項資訊「最不適合」直接輸入到公開的生成式 AI 工具中？",
+            options: [
+              "希望設計的圖卡風格（如：極簡風、溫暖手繪風）",
+              "目標受眾的年齡層（如：高中生、一般大眾）",
+              "班上同學的真實姓名、學號、住址與未經同意的個人照片",
+              "希望輸出的版面格式（如：1:1 社群圖卡、16:9 簡報）"
+            ],
+            ans: 2,
+            exp: "根據單元 1-2 個資與隱私保護原則，切勿輸入可識別個人身分的敏感資料（學號、住址、病歷），上傳他人照片也須先取得當事人同意。"
+          }
+        ]
+      },
+
+      {
+        id: 2,
+        name: "品牌靈魂之島",
+        book: "第一冊",
+        unitRange: "單元 2-1 & 2-2",
+        shortTitle: "2. 品牌與 Logo",
+        color: "#a855f7", // Purple
+        accentClass: "from-purple-500 to-fuchsia-600",
+        icon: "fa-gem",
+        position: { x: -16, y: 1.5, z: 32 },
+        labType: "prompt",
+        subUnits: [
+          {
+            code: "單元 2-1",
+            title: "Logo 設計入門：符號、四大類型與三大原則",
+            coreEssence: "小小的符號裝載大大的意義！Logo 的任務是讓人快速知道「你是誰」，並留下清楚的品牌印象。",
+            memoryHook: "好 Logo 不只好看，更要具備「識別性、簡潔性、延展性與可讀性」！",
+            flashcards: [
+              {
+                tag: "01 四大任務",
+                title: "Logo 的核心功能與價值",
+                points: [
+                  "① 快速辨識：在茫茫競爭者中一眼認出。",
+                  "② 區隔他人：展現與對手截然不同的特質。",
+                  "③ 傳達個性：訴說品牌理念（如鯨魚傳達友善海洋與活力）。",
+                  "④ 強化記憶：用精煉符號烙印在受眾腦海中。"
+                ]
+              },
+              {
+                tag: "02 四大類型",
+                title: "文字、字母、圖像與組合標誌",
+                points: [
+                  "【文字標誌】以品牌全名為核心（如：晨光日常、星野書店），適合新品牌快速打開知名度。",
+                  "【字母標誌】以縮寫或首字母設計（如：NEXORA），造型簡潔、現代感強、易縮小，需注意獨特辨識度。",
+                  "【圖像與抽象標誌】跨語言、視覺強烈（如：雲鹿、海語島），需適度簡化避免縮小糊成一團。",
+                  "【組合標誌與徽章】圖文結合資訊完整（如：汪汪咖啡），需考量拆開獨立使用時是否依然成立。"
+                ]
+              },
+              {
+                tag: "03 三大設計原則",
+                title: "識別性、簡潔性、延展性",
+                points: [
+                  "【識別性】抓住品牌最獨特的一點轉成圖像，避免與競品雷同。",
+                  "【簡潔性】去蕪存菁（刪掉多餘星星泡泡，只留核心線條），簡單更有力量。",
+                  "【延展性與可讀性】放大縮小、單色/黑白版本皆成立，在名片、招牌、手機頭像上都清晰。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 2-2",
+            title: "AI 與品牌設計實務：命名、關鍵字與情緒板",
+            coreEssence: "從模糊想法到具體畫面：先定義品牌核心，透過關鍵字聯想與情緒板（Mood board）對焦感覺，再定稿。",
+            memoryHook: "先定義再命名，先看感覺（情緒板）再做設計；喜歡不等於適合！",
+            flashcards: [
+              {
+                tag: "01 品牌命名",
+                title: "AI 品牌命名準備清單與評估",
+                points: [
+                  "命名前先準備 5 件事：產品定位、目標對象、個性價值、避開的詞、使用情境。",
+                  "評估名稱 5 標準：好念好記好辨識、能表現品牌特色、與競品有區隔、能延伸到視覺、搜尋方便。",
+                  "核心提醒：「喜歡不等於適合」，AI 負責大量發散，人負責策略判斷。"
+                ]
+              },
+              {
+                tag: "02 關鍵字地圖",
+                title: "用 AI 擴充品牌關鍵字",
+                points: [
+                  "關鍵字是品牌的「語言地圖」，讓命名、文案與視覺語意一致。",
+                  "擴充技巧：① 從功能詞擴到感受詞（保暖➔療癒） ② 把抽象詞轉成視覺詞（未來感➔光影、幾何城市）。",
+                  "依「色彩、材質、場景、人格」四大類別分組整理。"
+                ]
+              },
+              {
+                tag: "03 情緒板與全流程",
+                title: "Mood Board 情緒板與 6 步探索流程",
+                points: [
+                  "情緒板（Mood board）用圖片整合色彩、材質、字體與照片氛圍，是視覺方向的重要中介站。",
+                  "完整 6 步流程：①定義品牌核心 ➔ ②AI命名發想 ➔ ③關鍵字擴充 ➔ ④情緒板建立 ➔ ⑤風格比較（極簡/活潑/質感/未來） ➔ ⑥人工檢查與定稿。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "Logo 圖形細節處理",
+            good: "大膽刪減多餘裝飾，保留最具代表性的流暢幾何輪廓，縮小至 16px 社群頭像依然清晰可辨。",
+            bad: "把鯨魚、海浪、星星、泡泡與雲朵全部塞進同一個 Logo，縮小印在名片上時糊成一團黑點。"
+          },
+          {
+            aspect: "AI 品牌命名與探索順序",
+            good: "先定義目標受眾與核心價值，展開關鍵字地圖與情緒板對焦氛圍，再挑出最適合定位的方案。",
+            bad: "連產品賣給誰都還沒想清楚，就直接叫 AI「幫我取個好聽名字並畫 Logo」，單憑個人喜好亂選。"
+          }
+        ],
+        quiz: [
+          {
+            q: "一個新創立的獨立書店品牌「星野書店」，希望消費者第一眼就能記住完整店名且不產生混淆，最適合優先採用哪一種 Logo 類型？",
+            options: [
+              "極度抽象的幾何線條標誌",
+              "只放一個英文字母 S 的字母標誌",
+              "以品牌完整名稱為主體、強調字體設計感的「文字標誌」",
+              "細節極度繁複的古典歐洲家徽"
+            ],
+            ans: 2,
+            exp: "教材 2-1 指出：「文字標誌」以品牌名稱為主體，具備名稱完整、容易記住的特點，非常適合新品牌快速讓大眾認識自己。"
+          },
+          {
+            q: "在品牌視覺設計流程中，為什麼我們需要先製作「情緒板（Mood board）」？",
+            options: [
+              "直接當作最終的商業海報印刷出廠",
+              "用圖片整合色彩、材質、字體與氛圍，把抽象形容詞變成具體視覺方向，幫助團隊快速對焦",
+              "用來測試網站伺服器的連線速度",
+              "取代商標註冊的法律程序"
+            ],
+            ans: 1,
+            exp: "教材 2-2 強調：情緒板（Mood board）能把「溫暖、文青」等抽象形容詞轉為具體的色彩、材質與照片風格，做到「先看感覺，再做設計」。"
+          }
+        ]
+      },
+
+      {
+        id: 3,
+        name: "光影構圖之島",
+        book: "第一冊",
+        unitRange: "單元 3-1 & 3-2",
+        shortTitle: "3. 色彩與去背向量",
+        color: "#f59e0b", // Amber/Orange
+        accentClass: "from-amber-500 to-orange-600",
+        icon: "fa-palette",
+        position: { x: 12, y: 3, z: 28 },
+        labType: "inspector",
+        subUnits: [
+          {
+            code: "單元 3-1",
+            title: "AI 生成 Logo 草圖篩選與色彩構圖法則",
+            coreEssence: "先放大選項再收斂方案！用「辨識、簡潔、適配、一致」四大標準篩選草圖，並掌握 60-30-10 黃金配色。",
+            memoryHook: "選 Logo 不是選最酷，而是選最適合；Logo 各部分要像同一個團隊做出來的！",
+            flashcards: [
+              {
+                tag: "01 草圖篩選流程",
+                title: "保留、修改、淘汰三籃子法則",
+                points: [
+                  "AI 生成草圖適合發想初期，千萬不要只看第一張就定稿。",
+                  "第一輪快速掃視刪掉不適合者；第二輪分為「保留（完成度高）、修改（概念好但需微調）、淘汰」。",
+                  "四大篩選判準：① 識別性（一眼認出） ② 簡潔性（少即是多） ③ 可讀性與縮放（黑白版也成立） ④ 品牌適配。"
+                ]
+              },
+              {
+                tag: "02 風格一致與適配",
+                title: "避免混搭失衡，精準對焦受眾",
+                points: [
+                  "【風格一致】圓潤可愛字體若搭配尖銳攻擊性圖形會嚴重失衡；圖像、字體、配色要有相同氣質。",
+                  "【品牌適配】兒童品牌（可愛童趣安全）、科技品牌（創新專業未來）、環保品牌（自然永續友善）方向截然不同。",
+                  "漂亮不一定適合，符合品牌關鍵字與目標受眾才是真正可用。"
+                ]
+              },
+              {
+                tag: "03 經典色彩與構圖",
+                title: "色彩三要素與 60-30-10 配色彩則",
+                points: [
+                  "色彩三要素：色相（Hue）、明度（Value）、彩度（Chroma）。",
+                  "60-30-10 黃金比例：主導色 60%（定調背景與氛圍）、輔助色 30%（區分區塊）、點綴強調色 10%（視覺焦點）。",
+                  "構圖技巧：善用九宮格「三分法則」交點、留白呼吸空間與視覺對比。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 3-2",
+            title: "從照片到設計素材：去背、調色、簡化與向量化",
+            coreEssence: "掌握「去背 ➔ 調色 ➔ 簡化圖形 ➔ 向量化」完整四步工作流，把普通照片轉化為無限放大的專業設計資產。",
+            memoryHook: "先選準再修邊存透明 PNG；先校正再風格化；先看形、留特徵、最後做減法！",
+            flashcards: [
+              {
+                tag: "01 影像去背實戰",
+                title: "去背四步驟與常見疑難排解",
+                points: [
+                  "去背 = 保留主體，移除背景。四步驟：①選取主體 ➔ ②修整邊緣 ➔ ③刪除背景 ➔ ④輸出透明 PNG。",
+                  "常見四大問題：邊緣鋸齒、殘留背景色、主體漏選、半透明區域（玻璃/煙霧/細髮絲）不自然。",
+                  "解法：羽化或平滑邊緣、放大手動補修、選用背景單純且高對比的原圖。"
+                ]
+              },
+              {
+                tag: "02 色彩調整四大工具",
+                title: "先校正偏色，再賦予風格",
+                points: [
+                  "① 亮度／對比：讓畫面更明亮、加深陰影，立體層次更清楚。",
+                  "② 飽和度：控制色彩鮮豔程度（適量即可，避免過重刺眼）。",
+                  "③ 色相／色溫：改變色偏與冷暖氣氛（如冷調街景轉為溫暖夕陽）。",
+                  "④ 色階／曲線：精準微調亮部、中間調與暗部。切記「少量多次、注意膚色自然」。"
+                ]
+              },
+              {
+                tag: "03 簡化圖形與向量化",
+                title: "簡化三原則 & 點陣轉向量",
+                points: [
+                  "【簡化圖形三原則】① 抓輪廓（先看整體外形剪影） ➔ ② 留特徵（如貓耳、眼鏡、葉脈） ➔ ③ 減元素（減少線條與顏色）。",
+                  "【點陣 vs 向量】點陣圖由像素組成，放大會馬賽克失真；向量圖由數學路徑組成，可無損無限放大且易改色！",
+                  "向量化提醒：先簡化原圖、控制貝茲曲線節點不要太多、維持線條粗細一致。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "Logo 字體與圖形氣質搭配",
+            good: "自然有機的葉片圖標，搭配溫潤協調的無襯線字體與大地綠配色，整體宛如同一團隊出品。",
+            bad: "圓潤童趣的卡通字體，卻硬配一個尖銳刺眼的閃電鋸齒圖標與雜亂霓虹色，風格嚴重精神分裂。"
+          },
+          {
+            aspect: "去背與圖形向量化處理",
+            good: "去背邊緣平滑無殘留並存為透明 PNG；轉向量前先「抓輪廓、留特徵、減元素」，節點精簡流暢。",
+            bad: "去背邊緣像狗咬般充滿鋸齒與白邊，且存成不支援透明的 JPG；直接把複雜照片自動描圖導致上萬個雜亂節點。"
+          }
+        ],
+        quiz: [
+          {
+            q: "我們將黃金獵犬的照片去背並修整邊緣後，若希望保留「透明背景」以便合成到海報上，應該輸出為哪一種檔案格式？",
+            options: [
+              "JPG / JPEG 格式",
+              "TXT 純文字格式",
+              "PNG 格式（支援 Alpha 透明通道）",
+              "MP3 音訊格式"
+            ],
+            ans: 2,
+            exp: "教材 3-2 強調：去背四步驟為「選取主體 ➔ 修整邊緣 ➔ 刪除背景 ➔ 輸出透明 PNG」，JPG 格式不支援透明背景。"
+          },
+          {
+            q: "把複雜的真實貓咪照片轉化為簡潔清晰的 Icon 圖示時，教材提出的「簡化圖形三原則」順序為何？",
+            options: [
+              "先加上立體陰影 ➔ 再塗滿漸層色 ➔ 最後加上發光特效",
+              "① 抓輪廓（看整體外形） ➔ ② 留特徵（保留耳朵/斑紋等辨識點） ➔ ③ 減元素（減少多餘線條與裝飾）",
+              "直接把照片縮小到 10% 即可",
+              "將照片調成黑白後直接加上粗框線"
+            ],
+            ans: 1,
+            exp: "教材 3-2 口訣：「先看形（抓輪廓），再留特徵，最後做減法（減元素）」，少不等於隨便，少是更清楚！"
+          }
+        ]
+      },
+
+      {
+        id: 4,
+        name: "數據圖表之島",
+        book: "第二冊",
+        unitRange: "單元 4-1 & 4-2",
+        shortTitle: "4. 資訊圖表與轉化",
+        color: "#10b981", // Emerald
+        accentClass: "from-emerald-500 to-teal-600",
+        icon: "fa-chart-pie",
+        position: { x: 34, y: 4.5, z: 10 },
+        labType: "chart",
+        subUnits: [
+          {
+            code: "單元 4-1",
+            title: "資訊圖表（Infographics）6 大類型與設計原則",
+            coreEssence: "圖表讓資訊說話！先想你要回答什麼問題，再選對圖表類型，並遵循「清楚、簡潔、一致、易讀」四大關鍵。",
+            memoryHook: "比差異用比較、看步驟用流程、看先後用時間軸、看占比用比例、看位置用地圖、看趨勢用統計！",
+            flashcards: [
+              {
+                tag: "01 六大圖表選型(上)",
+                title: "比較型、流程型、時間軸",
+                points: [
+                  "【比較型】想看差異、優缺點與 A vs B 對決時用（形式：表格比較、對照卡片，如紙本書 vs 電子書）。",
+                  "【流程型】想看做事步驟與操作順序時用（元素：箭頭、步驟編號、流程框，如完成報告 4 步驟）。",
+                  "【時間軸】想看歷史事件先後、成長演變時用（元素：年份、節點、連線，如校慶準備 9~12 月時程）。"
+                ]
+              },
+              {
+                tag: "02 六大圖表選型(下)",
+                title: "比例圖、地圖型、統計圖",
+                points: [
+                  "【比例圖】想看各部分占整體百分比與資源分配時用（形式：圓餅圖、甜甜圈圖、百分比條，如一天時間分配）。",
+                  "【地圖型】想看地理位置與區域分布差異時用（元素：地圖底圖、水滴標記點、顏色分區，如臺灣降雨分布）。",
+                  "【統計圖】想比較數量大小或隨時間變化趨勢時用（形式：長條圖比大小、折線圖看趨勢、散點圖看相關性）。"
+                ]
+              },
+              {
+                tag: "03 設計原則與避坑",
+                title: "4 個關鍵、3 個加分與 4 大常見錯誤",
+                points: [
+                  "4 關鍵：清楚（主題明確）、簡潔（文字不過多）、一致（色彩風格統一）、易讀（字體大層次清）。",
+                  "3 加分：善用小圖示與留白、重點用顏色強調、務必標示「資料來源」提升公信力。",
+                  "避開 4 大錯誤：❌文字太多 ❌顏色太亂 ❌圖表選錯（如想看趨勢卻用圓餅圖） ❌重點不明。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 4-2",
+            title: "文本轉視覺：重點擷取、分類、階層與條列表格",
+            coreEssence: "做筆記的目標是「幫助思考」而非盲目抄寫！透過擷取關鍵、分類整理、三層架構與視覺符號，讓複雜變清晰。",
+            memoryHook: "讀懂 ➔ 整理 ➔ 看見 ➔ 記住！段落轉條列掌握「一句一重點、動詞清楚、字數簡短」。",
+            flashcards: [
+              {
+                tag: "01 抓重點與分類",
+                title: "如何從長文抓重點並做分類？",
+                points: [
+                  "抓重點 4 線索：重複出現的關鍵詞、標題或小標、重要數字、作者結論（刪去過多修飾語與離題細節）。",
+                  "4 種常見分類法：依主題、依時間先後、依適用對象、依內容性質（如校園垃圾分為可回收、一般、廚餘）。",
+                  "分類三提醒：分類標準要一致、每項只放最適合位置、分類名稱要簡短清楚。"
+                ]
+              },
+              {
+                tag: "02 階層架構與符號",
+                title: "三層閱讀階層 × 四大視覺符號",
+                points: [
+                  "【三層架構】第一層：主標題（最大） ➔ 第二層：重點分類 ➔ 第三層：具體例子或說明（利用字級、顏色、縮排、線條區分）。",
+                  "【四大視覺符號】圖示（代表概念）、箭頭（表示流程）、色塊（區分類別）、框線（強調重點）。",
+                  "用色原則：同類用同色、重點色不超過 2~3 種、利用深淺變化表現層級。"
+                ]
+              },
+              {
+                tag: "03 條列、表格與版型",
+                title: "段落轉條列、資料轉表格與自我檢核",
+                points: [
+                  "【段落轉條列 4 步】先讀一遍 ➔ 畫關鍵詞 ➔ 刪重複 ➔ 改寫短句（原則：一句一重點、動詞開頭、字數簡短）。",
+                  "【資料轉表格 4 元素】標題、橫向欄位、縱向列項目、單位或備註（適合比對多項目且有固定欄位時）。",
+                  "【看內容選版型】有先後➔流程圖；有分類➔心智圖；要比較➔比較圖；有時間順序➔時間軸。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "數據圖表類型選擇與降噪",
+            good: "想呈現 1~6 月班級閱讀量成長趨勢時選用「長條圖結合折線圖」，並剔除無意義的 3D 陰影與雜亂格線。",
+            bad: "想呈現時間趨勢卻誤用圓餅圖，或在一張圖裡硬塞五種不同圖表與十幾種刺眼顏色，導致讀者眼花撩亂。"
+          },
+          {
+            aspect: "長篇段落轉化為條列重點",
+            good: "萃取核心改寫為：「● 提供借書服務 ● 提供閱讀空間 ● 提供資訊查詢」，動詞開頭、一句一重點。",
+            bad: "整句照抄原文長段，或一點裡面塞入三四件事且前後條列彼此重複，完全失去條列意義。"
+          }
+        ],
+        quiz: [
+          {
+            q: "如果你想設計一張圖表，用來呈現「一天 24 小時當中，睡眠（35%）、上課（30%）、休閒（20%）、其他（15%）各占多少百分比」，最適合選用哪一種資訊圖表？",
+            options: [
+              "地圖型資訊圖表",
+              "比例圖（如圓餅圖、甜甜圈圖或百分比條）",
+              "時間軸資訊圖表",
+              "標準作業流程圖"
+            ],
+            ans: 1,
+            exp: "教材 4-1 一句話記憶：「想看占比（部分與整體的關係），就用比例圖！」常見形式包含圓餅圖、甜甜圈圖與百分比條。"
+          },
+          {
+            q: "在將長篇文字轉換為「條列式重點」時，教材強調的三大黃金原則是什麼？",
+            options: [
+              "字數越長越好、多用華麗成語、把所有想法擠在同一點",
+              "一句一重點、動詞清楚開頭、字數簡短",
+              "整句照抄課文、不加任何標點符號、字體全部設為最小",
+              "每條都用不同字型、不同底色與閃爍特效"
+            ],
+            ans: 1,
+            exp: "教材 4-2 指出：條列三原則為「一句一重點（每條只放一個核心概念）、動詞清楚（用具體動詞開頭更直接）、字數簡短」。"
+          }
+        ]
+      },
+
+      {
+        id: 5,
+        name: "智慧視覺系統島",
+        book: "第二冊",
+        unitRange: "單元 5-1 & 5-2",
+        shortTitle: "5. AI 整理與完稿檢查",
+        color: "#3b82f6", // Blue
+        accentClass: "from-blue-500 to-indigo-600",
+        icon: "fa-clipboard-check",
+        position: { x: 26, y: 6, z: -22 },
+        labType: "inspector",
+        subUnits: [
+          {
+            code: "單元 5-1",
+            title: "AI 協助內容整理、標題優化與版面配置",
+            coreEssence: "AI 不是代替思考，而是加快整理與設計！把任務拆小（摘要➔標題➔圖表建議➔版面規劃➔人工修正），和 AI 分工效率最高。",
+            memoryHook: "好摘要讓重點更清楚；好標題讓人一眼看懂；好版面帶著讀者一步步讀完！",
+            flashcards: [
+              {
+                tag: "01 AI 摘要技巧",
+                title: "把長內容變成清楚重點清單",
+                points: [
+                  "摘要 4 大核心任務：找出主旨與關鍵訊息、刪除重複與次要細節、整理成分類與條列、轉成易讀短句。",
+                  "下提示詞 4 重點：①說明資料主題 ②指定摘要字數或點數（如100字/5個重點） ③指定對象（學生/教師） ④指定輸出格式（條列/表格）。",
+                  "適用資料：研究文章、課堂講義、會議筆記、訪談逐字稿。"
+                ]
+              },
+              {
+                tag: "02 吸睛標題公式",
+                title: "用 AI 產生並優化標題文案",
+                points: [
+                  "好標題 4 原則：明確（不困惑）、簡潔、符合內容（不標題殺人）、符合對象語言。",
+                  "3 種常見標題類型：提問式（「你知道AI可以這樣用嗎？」）、數字式（「5個提升效率的AI工具」）、對比式（「傳統方法 vs AI 哪個更有效？」）。",
+                  "3 大標題公式：① 主題＋對象＋價值 ② 問題＋解法 ③ 數字＋重點＋情境。"
+                ]
+              },
+              {
+                tag: "03 版面與 6 步協作",
+                title: "AI 版面建議與 6 步協作實作流程",
+                points: [
+                  "常見三大版型：【單欄式】適合簡潔內容呈現；【雙欄式】適合圖文並重或對照主題；【卡片式】適合多個重點模組化整理。",
+                  "版面結構四區塊：標題區（吸引注意）➔ 主視覺區（強化主題）➔ 重點區（主要內容）➔ 結論區（總結或行動）。",
+                  "AI 協作 6 步驟：①蒐集原始資料 ➔ ②請AI摘要整理 ➔ ③產生標題文案 ➔ ④建議圖表形式 ➔ ⑤規劃版面配置 ➔ ⑥人工修正並完成。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 5-2",
+            title: "視覺化設計完稿前的 5 大檢查與 10 點清單",
+            coreEssence: "細節到位，作品加分！完成作品前至少做一次整體檢查，讓圖卡「更清楚、更好讀、更可信」。",
+            memoryHook: "看得清楚比只看好看更重要！資訊錯了，設計再漂亮也會失去信任。",
+            flashcards: [
+              {
+                tag: "01 色彩與圖示檢查",
+                title: "檢查 1 & 2：色彩層級對比 × 圖示一致性",
+                points: [
+                  "【色彩層級】主色（定風格，1種）、輔色（協助分類分區）、強調色（標關鍵重點）要分明，全版主要色系以 3~4 種為佳。",
+                  "【色彩對比】避免「亮底配淺字、暗底配深字」；可用「灰階檢查」測試重點是否仍在，並考量色弱友善（不只靠顏色區分）。",
+                  "【圖示一致性】檢查線條粗細、填色方式（扁平/描邊/雙色）、大小比例與語意對應，切忌同時混用扁平、立體與手繪圖示。"
+                ]
+              },
+              {
+                tag: "02 標示與圖表檢查",
+                title: "檢查 3：資料標示與圖表易讀性",
+                points: [
+                  "【資料標示 4 要素】① 標題清楚 ② 單位完整（人、%、元、公里不可少） ③ 時間範圍（哪一年/期間） ④ 資料來源（引用出處）。",
+                  "【圖表一眼看懂 4 細節】① 軸線與刻度區間標明 ② 圖例說明清楚 ③ 百分比最好搭配母數總數一起看 ④ 專有名詞與縮寫加註解。"
+                ]
+              },
+              {
+                tag: "03 可讀性與正確性",
+                title: "檢查 4 & 5：可讀性動線 × 資訊正確性查核",
+                points: [
+                  "【可讀性 4 點】全版字體以 1~2 種為佳、字級層次分明（標題/副標/內文）、行距留白有呼吸感、文字與區塊對齊整齊。",
+                  "【閱讀動線】由上到下由左至右、加上數字編號 1➔2➔3 或箭頭、相關資訊區塊分組。",
+                  "【資訊正確性 4 查】① 數字重算（加總、平均、百分比） ② 名詞與日期不寫錯 ③ 圖表長度面積比例不誤導 ④ AI 內容再查證。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "色彩對比與字體可讀性",
+            good: "全版維持 1~2 種字體、主要色系控制在 3~4 色，深色背景搭配高明度白/黃字，轉成灰階後層次依然清晰。",
+            bad: "亮黃色背景配淺白色文字（亮底配淺字），全版混用 6 種花俏字體且行距擁擠，讀者完全看不清。"
+          },
+          {
+            aspect: "圖表標示與數據核查",
+            good: "完整標註標題、單位（% 與總母數）、調查年份與教育部出處，並親自用計算機重算百分比加總為 100%。",
+            bad: "圖表只有光禿禿的數字卻沒寫單位是「人」還是「萬元」，且 AI 生成的圓餅圖加總竟高達 135% 卻未發現。"
+          }
+        ],
+        quiz: [
+          {
+            q: "在完稿檢查「色彩對比」時，教材建議可以使用哪一種實用技巧，來快速檢驗畫面的明暗對比與重點是否依然清晰？",
+            options: [
+              "把螢幕亮度調到最高",
+              "將畫面暫時轉為「灰階（黑白）」檢查，看看文字與背景是否明顯分開、重點還在不在",
+              "把所有文字都加上七彩霓虹外框",
+              "把字體縮小到 6pt 測試視力"
+            ],
+            ans: 1,
+            exp: "教材 5-2（Flash Card 03）明確指出：避免亮底配淺字、暗底配深字，「可用灰階檢查，看看重點還在不在」。"
+          },
+          {
+            q: "關於圖卡的可讀性檢查，一個版面中使用的「字體種類」與「主要色系」以多少數量為最佳？",
+            options: [
+              "字體 1~2 種為佳；主要色系 3~4 種為佳",
+              "字體 8~10 種；主要色系 12 種以上越豐富越好",
+              "每個段落都換一種手寫字體",
+              "全版只能用純黑與純白，不可有任何強調色"
+            ],
+            ans: 0,
+            exp: "教材 5-2 規範：全版字體以 1 到 2 種為佳（避免雜亂），主要色系（主色、輔色、強調色）以 3 到 4 種為佳。"
+          }
+        ]
+      },
+
+      {
+        id: 6,
+        name: "圖卡解構工坊島",
+        book: "第二冊",
+        unitRange: "單元 6-1 & 6-2",
+        shortTitle: "6. 圖卡架構與腳本",
+        color: "#ec4899", // Pink
+        accentClass: "from-pink-500 to-rose-600",
+        icon: "fa-layer-group",
+        position: { x: -4, y: 7.5, z: -34 },
+        labType: "prompt",
+        subUnits: [
+          {
+            code: "單元 6-1",
+            title: "知識圖卡的 6 大結構與版面整合",
+            coreEssence: "先懂骨架，才能做出清楚、好讀、可信的圖卡！重點不是把資訊塞滿，而是把 6 大結構說清楚。",
+            memoryHook: "主標一眼看懂、副標補上情境、重點句一句抓核心、圖像輔助直覺理解、引用來源更可信、行動提示往前一步！",
+            flashcards: [
+              {
+                tag: "01 標題與重點句",
+                title: "結構 1~3：主標題 × 副標題 × 重點句",
+                points: [
+                  "①【主標題】短、準、明確（建議 12 字內），指出單一主題（如「海洋垃圾對生態的影響」✔ vs「你不可不知的重要議題」✖）。",
+                  "②【副標題】補充範圍、對象、情境或切入角度（如主標「校園垃圾問題」＋副標「從回收習慣、餐盒使用與環境維護來看」），絕非重複主標。",
+                  "③【重點句】如果讀者看完只能記住一句話，那句就是重點句！短而有力表達因果或結論，放在醒目色塊或框線區。"
+                ]
+              },
+              {
+                tag: "02 圖像、來源與CTA",
+                title: "結構 4~6：圖像輔助 × 引用來源 × 行動提示",
+                points: [
+                  "④【圖像輔助】可用圖示（傳達概念）、簡圖（比較數據趨勢）、小圖表（生動情境）。圖片是幫助理解的工具，若無助理解就該刪掉。",
+                  "⑤【引用來源】標示作者/單位、年份、標題（如：教育部 (2025)。數位學習推動成果報告），切忌只寫「網路資料」四字。",
+                  "⑥【行動提示 CTA】把「看完」變成「做點什麼」（觀察、比較、記錄、分享），動作要明確可在短時間完成，不寫「請多思考」等空話。"
+                ]
+              },
+              {
+                tag: "03 版面整合與避坑",
+                title: "閱讀順序整合與 5 大常見錯誤",
+                points: [
+                  "版面閱讀流：先看主標題 ➔ 抓到重點句 ➔ 看圖像輔助與條列 ➔ 找到引用來源與完成行動提示。",
+                  "避開 5 大錯誤：①主標題模糊 ②副標與內文太長畫面擁擠 ③圖片好看但與重點無關 ④引用數據卻無來源 ⑤看完沒有下一步行動。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 6-2",
+            title: "長文轉圖卡：先做腳本、卡片地圖與人工編修",
+            coreEssence: "先做腳本，再做版面，圖卡會更清楚！先切塊拆解長文，用「卡片地圖（Card Map）」排好 3~5 張骨架，AI 生成後必做人工編修。",
+            memoryHook: "先排骨架（卡片地圖）再補細節；AI 負責加速，人負責判斷，千萬不要直接複製貼上！",
+            flashcards: [
+              {
+                tag: "01 拆解長文與提示詞",
+                title: "摘要前先做「資訊切塊」＋ 完整提示詞 5 要素",
+                points: [
+                  "動手前先想 3 件事：受眾是誰？想傳達什麼？預計做幾張卡？",
+                  "【長文拆解 4 步驟】①找出主題句 ②標記關鍵詞 ③分成 3~5 個面向（背景/問題/原因/解法） ④刪去枝節與重複。",
+                  "【給 AI 的提示詞 5 要素】①提供原文或摘要 ②指定受眾（如高中生） ③指定張數（3~5張） ④指定每張欄位（標題、3重點、圖像建議、結尾一句） ⑤指定語氣（簡潔易懂）。"
+                ]
+              },
+              {
+                tag: "02 連續圖卡與卡片地圖",
+                title: "3~5 張連續圖卡編排邏輯 & Card Map",
+                points: [
+                  "【3 張：概念解釋型】是什麼 ➔ 為什麼 ➔ 怎麼做（快速說清一個主題）。",
+                  "【4 張：重點說明型】導入 ➔ 重點一 ➔ 重點二 ➔ 結論（如校園減塑：塑膠問題➔為何校園是關鍵➔可行做法3項➔師生立即行動）。",
+                  "【5 張：問題解決型】導入 ➔ 問題 ➔ 方法 ➔ 例子 ➔ 行動（完整呈現故事）。先畫「卡片地圖」定好每張任務，才不會重複！"
+                ]
+              },
+              {
+                tag: "03 人工編修與 5 檢查點",
+                title: "AI 產出後必做人工編修 5 重點",
+                points: [
+                  "人工修正 5 重點：①查核事實與數據 ②刪除重複句 ③把長句改成短句 ④調整語氣符合受眾 ⑤補上可追溯資料來源。",
+                  "好圖卡完成前 5 個檢查點：①一張只講一個重點 ②標題一看就懂 ③文字不過量 ④圖文彼此對應 ⑤張與張具有連續性。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "知識圖卡的主標題與行動提示（CTA）",
+            good: "主標題寫「睡眠不足的 3 個影響」（12字內明確破題）；底部行動提示寫「請記錄你今天使用塑膠製品的次數」（具體可執行）。",
+            bad: "主標題寫「一些很重要的事情」（籠統空泛）；底部行動提示寫「請大家多多思考」（空泛無法執行）。"
+          },
+          {
+            aspect: "長文轉連續圖卡的工作流程",
+            good: "先切塊長文並規劃 4 張「卡片地圖」骨架，請 AI 生成分張腳本後，人工把長句改短並補上教育部白皮書出處。",
+            bad: "把兩千字文章直接丟給 AI 說「幫我做圖卡」，連錯字與重複句子都沒改就全部塞進同一張畫面裡。"
+          }
+        ],
+        quiz: [
+          {
+            q: "在設計一張知識圖卡時，下列哪一個「主標題」與「行動提示（CTA）」的搭配最符合教材 6-1 的優良規範？",
+            options: [
+              "主標：你一定要知道的內容 ／ 行動提示：請多思考",
+              "主標：海洋垃圾對生態的影響 ／ 行動提示：觀察你今天的一天，記錄使用一次性塑膠袋的次數",
+              "主標：關於我們人類在地球上生活所面臨的各種環境與氣候變遷大問題探討 ／ 行動提示：無",
+              "主標：重要資訊分享 ／ 行動提示：看完就好"
+            ],
+            ans: 1,
+            exp: "教材 6-1 強調：主標題要短、準、明確（12字內指出主題）；行動提示要給出明確、難度適中且可立即執行的下一步（如觀察、比較、記錄、分享）。"
+          },
+          {
+            q: "當我們要將一篇長文規劃成「3 張連續圖卡（概念解釋型）」時，最經典且順暢的邏輯順序為何？",
+            options: [
+              "第一張：結論 ➔ 第二張：參考文獻 ➔ 第三張：封面標題",
+              "第一張：是什麼（What） ➔ 第二張：為什麼（Why） ➔ 第三張：怎麼做（How）",
+              "三張全部放一模一樣的條列文字，只是換不同背景顏色",
+              "第一張塞滿 800 字原文，後兩張留白"
+            ],
+            ans: 1,
+            exp: "教材 6-2（Flashcard 05）指出：3 張連續圖卡最適合「概念解釋型」，邏輯為「是什麼 ➔ 為什麼 ➔ 怎麼做」，能快速說清一個主題。"
+          }
+        ]
+      },
+
+      {
+        id: 7,
+        name: "社群節奏傳播島",
+        book: "第三冊",
+        unitRange: "單元 7-1 & 7-2",
+        shortTitle: "7. 系列素材與節奏",
+        color: "#f43f5e", // Rose
+        accentClass: "from-rose-500 to-red-600",
+        icon: "fa-bolt",
+        position: { x: -28, y: 9, z: -12 },
+        labType: "inspector",
+        subUnits: [
+          {
+            code: "單元 7-1",
+            title: "運用 AI 製作一致風格圖卡系列：四大核心素材",
+            coreEssence: "好的圖卡從明確的素材規劃開始！先決定「插圖、圖示、背景元素、輔助文案」四種素材，並用共同規則統整風格。",
+            memoryHook: "插圖負責吸睛說故事、一致圖示讓圖卡更專業、好背景襯托不搶戲、文案短清楚好掃讀！",
+            flashcards: [
+              {
+                tag: "01 四大素材生成",
+                title: "插圖、圖示、背景元素與輔助文案",
+                points: [
+                  "①【主視覺插圖】表現主題情境與故事感（提示詞含：主題/場景/角色 ＋ 風格/色調/構圖方向，多生幾版再挑）。",
+                  "②【成套圖示 Icon】快速傳達概念與分類（原則：外形簡潔避免細節過多、同一套風格一致、優先對應常見功能）。",
+                  "③【背景元素】色塊（區分資訊區域）、線條與圖樣（增加節奏感）、留白（讓重點突出，襯托內容而不搶戲）。",
+                  "④【輔助文案】標題點出主題、副標補充情境、重點句濃縮核心、提示語引導行動（短、清楚、好掃讀）。"
+                ]
+              },
+              {
+                tag: "02 風格統整四面向",
+                title: "一致風格來自共同規則（Style Guide）",
+                points: [
+                  "① 色彩：固定主色與輔助色，不可每張換一套配色。",
+                  "② 字體：標題與內文字級層級一致。",
+                  "③ 圖像：插圖筆觸與圖示語言統一。",
+                  "④ 版型：卡片結構、邊界與間距一致。"
+                ]
+              },
+              {
+                tag: "03 五步製作流程",
+                title: "從發想到完成的 5 步驟與品質檢查",
+                points: [
+                  "五步驟流程：①定主題（明確想法設定方向） ➔ ②生素材（用AI生多種素材） ➔ ③挑版本（比較選出最合適） ➔ ④做排版（整合圖文） ➔ ⑤再檢查。",
+                  "完成前 4 大檢查：文字是否清楚易讀？風格是否前後一致？圖片與內容是否相符？資料來源與使用是否適當？"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 7-2",
+            title: "社群平台尺寸、3-10-30 秒閱讀節奏與吸睛封面",
+            coreEssence: "先選對平台版型再安排內容！用封面抓住 3 秒停留，用 3-10-30 秒閱讀法與「上、中、下」版面公式引導吸收。",
+            memoryHook: "3 秒看主標主圖、10 秒懂 2~3 個重點、30 秒讀細節；好看，也要好懂！",
+            flashcards: [
+              {
+                tag: "01 平台尺寸速查",
+                title: "四種常用社群比例與適用情境",
+                points: [
+                  "【1:1 方形 (1080×1080)】通用貼文、知識摘要卡，構圖最平衡。",
+                  "【4:5 直式 (1080×1350)】手機螢幕占比高、視覺包覆強、較吸睛，適合 IG/FB 重點貼文。",
+                  "【9:16 全螢幕 (1080×1920)】限時動態（Stories）、Reels、Shorts 短影音封面。",
+                  "【16:9 橫式 (1920×1080)】YouTube 影片縮圖、電腦簡報截圖。切記：先定尺寸，再排版！"
+                ]
+              },
+              {
+                tag: "02 閱讀節奏與封面",
+                title: "3-10-30 秒閱讀法 × 封面吸睛 4 招",
+                points: [
+                  "【3-10-30 秒閱讀法】3 秒先看到主標與主圖 ➔ 10 秒理解 2~3 個重點 ➔ 30 秒吸收細節、步驟或例子。",
+                  "【提高封面吸引力 4 招】① 利益點（告訴讀者能得到什麼，如「快速上手」） ② 關鍵字放大（如「3步做好圖卡」） ③ 主視覺強化印象 ④ 好奇心留下繼續看的理由。"
+                ]
+              },
+              {
+                tag: "03 好讀版面公式",
+                title: "上、中、下三區版面公式與發布前 30 秒檢查",
+                points: [
+                  "【好讀圖卡版面公式】上區（主標題＋一句話重點） ➔ 中區（主圖像＋3 個重點） ➔ 下區（來源、註記或行動提示）。",
+                  "【發布前最後 30 秒 6 檢查】①平台尺寸正確嗎？ ②封面夠吸睛嗎？ ③一張只講一個重點嗎？ ④資訊層級清楚嗎？ ⑤字體夠大手機好讀嗎？ ⑥整組風格一致嗎？"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "社群圖卡封面設計",
+            good: "改版後：大字突顯「用 AI 創造你的夢想畫面！新手也能輕鬆上手」，搭配單一吸睛主圖與充足留白，一眼就想點進來。",
+            bad: "改版前：在封面塞滿工具介紹、操作步驟、實例練習、常見問題等密密麻麻小字，主次不分瞬間被滑過。"
+          },
+          {
+            aspect: "跨平台尺寸適配",
+            good: "先確認發布在 IG 限動（9:16）或貼文（4:5 / 1:1），依比例重新調整字級、留白與構圖。",
+            bad: "把 16:9 寬螢幕簡報直接硬塞進 1:1 貼文框，導致左右兩側重要標題被自動裁切掉。"
+          }
+        ],
+        quiz: [
+          {
+            q: "根據單元 7-2 的「3秒、10秒、30秒閱讀法」，讀者在滑過圖卡的「前 3 秒」主要會看到什麼，並藉此決定是否停下來？",
+            options: [
+              "圖卡最底部的參考文獻網址與小字註解",
+              "主標題與主視覺圖（建立整體印象與利益點）",
+              "第三頁中間的詳細操作參數表格",
+              "作者的個人履歷與聯絡電話"
+            ],
+            ans: 1,
+            exp: "教材 7-2 指出：3 秒先看到「主標與主圖」，10 秒理解 2~3 個重點，30 秒吸收細節、步驟或例子。最重要的訊息要放在最先被看到的位置！"
+          },
+          {
+            q: "教材 7-2 提出的「一張好讀圖卡的版面公式（上區、中區、下區）」，其中佔據最大版面的「中區」建議如何配置？",
+            options: [
+              "放滿 500 字不換行的純文字段落",
+              "1 張主圖像 ＋ 3 個精煉重點",
+              "放置 10 個不同風格的 QR Code",
+              "全部留白不放任何內容"
+            ],
+            ans: 1,
+            exp: "教材 7-2（閃卡 9/10）版面公式：上區（主標題+一句話重點）、中區（主圖像+3個重點）、下區（來源、註記或行動提示）。"
+          }
+        ]
+      },
+
+      {
+        id: 8,
+        name: "跨媒延伸矩陣島",
+        book: "第三冊",
+        unitRange: "單元 8-1 & 8-2",
+        shortTitle: "8. 系統整合與跨載體",
+        color: "#6366f1", // Indigo
+        accentClass: "from-indigo-500 to-violet-600",
+        icon: "fa-Share-nodes",
+        position: { x: -12, y: 10.5, z: 2 },
+        labType: "chart",
+        subUnits: [
+          {
+            code: "單元 8-1",
+            title: "Logo、資訊圖表與知識圖卡的完整視覺系統整合",
+            coreEssence: "從品牌到內容，以「規範系統（色彩、字體、圖示、版面）」將 Logo、資訊圖表與知識圖卡串聯成一致且可延伸的視覺系統。",
+            memoryHook: "Logo 是系統的起點；同一套視覺語言，讓識別、數據與知識圖卡像一家人！",
+            flashcards: [
+              {
+                tag: "01 三大核心模組",
+                title: "Logo × 資訊圖表 × 知識圖卡 × 規範系統",
+                points: [
+                  "①【Logo】建立品牌識別、形成記憶點、代表核心精神（系統的起點）。",
+                  "②【資訊圖表】整理資料、強化比較，讓複雜數據更容易理解。",
+                  "③【知識圖卡】濃縮重點、支援複習，適合連續閱讀與社群分享。",
+                  "④【規範系統】以色彩、字體、圖示、圖形元素與版面規則把三者串起來。"
+                ]
+              },
+              {
+                tag: "02 視覺規範與動線",
+                title: "五大視覺規範與 Z 型 / F 型閱讀動線",
+                points: [
+                  "五大規範：色彩系統（主/輔/強調/中性文字色比例）、字體系統（標題/內文/數據分工）、圖示風格（線性/扁平/圓角統一）、圖形元素（漸層標籤/圓角卡）、版面規則。",
+                  "【Z 型動線】適合少量重點、視覺導向的海報或封面。",
+                  "【F 型動線】適合文字較多、資訊導向的圖卡或學習單。"
+                ]
+              },
+              {
+                tag: "03 系統檢核表",
+                title: "完整視覺系統 6 大檢核表",
+                points: [
+                  "① 識別檢查：Logo 是否清楚易辨、應用一致？ ② 版面檢查：標題層級清楚、路徑順暢、留白充足？",
+                  "③ 內容檢查：圖表數據正確、圖卡重點明確好讀？ ④ 風格檢查：色彩、字體、圖示、插圖是否統一？",
+                  "⑤ 應用檢查：能否延伸到海報(3:2)、簡報(16:9)、社群(1:1/9:16)與學習單(A4)？ ⑥ 成果目標：形成可持續使用的系統。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 8-2",
+            title: "跨載體延伸應用：海報、簡報、名片、周邊與印刷規範",
+            coreEssence: "同一視覺，不同版型！固定核心元素（Logo、主色、字體、圖示），隨載體調整尺寸與比例，並嚴守安全邊界與高解析輸出。",
+            memoryHook: "固定核心識別、變動尺寸版面；重要文字不貼邊，印刷注意裁切線與高解析度！",
+            flashcards: [
+              {
+                tag: "01 海報、簡報與貼文",
+                title: "活動海報 × 簡報封面 × 社群貼文要點",
+                points: [
+                  "【活動海報】主標題最大最先被看見；日期/時間/地點排成第二層資訊；主視覺聚焦單一亮點；預留報名或 QR code 區。",
+                  "【簡報封面】你的開場名片！標題、副標與講者資訊清楚分層；色彩與內頁一致；留白充足不塞滿。",
+                  "【社群貼文】依平台調 1:1、4:5、9:16；3 秒內看懂重點；系列貼文套用統一模板。"
+                ]
+              },
+              {
+                tag: "02 名片與實體周邊",
+                title: "商務名片 × 周邊商品（帆布袋/T恤/貼紙/徽章）",
+                points: [
+                  "【名片設計】小尺寸高辨識！僅保留必要資訊（姓名、職稱、聯絡方式）；正反面分工（正面品牌識別／反面聯絡資訊）；字級夠大確保印刷清晰。",
+                  "【周邊視覺稿】常見於貼紙、帆布袋、T恤、徽章、馬克杯；圖像必須「簡化」以利實體印製與裁切，並測試單色版與極小尺寸辨識度。"
+                ]
+              },
+              {
+                tag: "03 尺寸調整與完稿",
+                title: "安全邊界、高解析度與完稿 4 檢核",
+                points: [
+                  "先確認用途是「螢幕、投影、還是實體印刷」（如手機 1080×1350、簡報 1920×1080、A3 海報 297×420mm）。",
+                  "注意「裁切線（出血）、安全區域與留白」，重要文字與 Logo 絕對不要貼邊！務必高解析輸出避免模糊馬賽克。",
+                  "上線前 4 確認：文字正確無錯字、圖像與資訊一致、尺寸格式（JPG/PNG/PDF/MP4）與解析度正確、符合品牌形象。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "跨載體延伸的一致性控制",
+            good: "從活動海報、16:9 簡報、名片到帆布袋，皆固定「山與未來」Logo、藍綠主色與圓角圖示，一眼認出同一品牌。",
+            bad: "海報用科技霓虹風、名片用古典書法風、簡報又換成卡通粉紅風，讓人完全看不出是同一個活動。"
+          },
+          {
+            aspect: "名片與印刷品排版邊界",
+            good: "名片正面專注品牌識別、反面清晰排列聯絡資訊，且所有重要文字皆保留在「安全區域」內並採高解析輸出。",
+            bad: "名片塞滿長篇自我介紹且字級小於 5pt，重要電話號碼緊貼裁切邊緣，印出來直接被裁掉一半且模糊失真。"
+          }
+        ],
+        quiz: [
+          {
+            q: "在將同一套品牌視覺延伸到「海報、社群貼文、網站橫幅、名片與帆布袋」時，下列哪些屬於應該「固定不變」的核心元素？",
+            options: [
+              "畫布的長寬像素尺寸與印刷材質",
+              "Logo、品牌主色彩、標準字體與圖示風格",
+              "每一種載體的文字字數都必須一模一樣",
+              "所有載體都強制使用 9:16 直式比例"
+            ],
+            ans: 1,
+            exp: "教材 8-2（Flashcard 07）指出：一致性延伸要「固定核心元素：Logo、主色、字體、圖示風格」，而「變動元素：尺寸、版面、圖片比例」則隨載體調整。"
+          },
+          {
+            q: "設計實體印刷海報或商務名片時，為什麼教材特別強調「重要文字不要貼邊」並要注意安全邊界？",
+            options: [
+              "因為中間的油墨比較便宜",
+              "避免在印刷裁切加工時，邊緣的重要文字或 Logo 被意外切除，同時保留視覺呼吸感",
+              "為了讓檔案體積變小",
+              "因為螢幕無法顯示邊緣的像素"
+            ],
+            ans: 1,
+            exp: "教材 8-2（Flashcard 08）說明：印刷品需區分裁切線、安全區域與內容區域，重要文字不貼邊才能避免裁切失誤並維持美觀留白。"
+          }
+        ]
+      },
+
+      {
+        id: 9,
+        name: "設計師聖殿島",
+        book: "第三冊",
+        unitRange: "單元 9-1 & 9-2",
+        shortTitle: "9. 設計全景與發表",
+        color: "#eab308", // Gold/Yellow
+        accentClass: "from-amber-400 via-yellow-500 to-orange-500",
+        icon: "fa-crown",
+        position: { x: 0, y: 12.5, z: 0 },
+        labType: "inspector",
+        subUnits: [
+          {
+            code: "單元 9-1",
+            title: "AIGC 設計流程全景：從問題定義到最終成品",
+            coreEssence: "AIGC 設計 = 人類判斷 × AI 生成 × 反覆優化！掌握「先想清楚 ➔ 說清楚 ➔ 看清楚 ➔ 修清楚」的完整五步驟閉環。",
+            memoryHook: "人定方向，AI 加速，人工把關！清楚、正確、美觀、合法、可用。",
+            flashcards: [
+              {
+                tag: "01 步驟一 & 二",
+                title: "問題定義 5 問 × 提示詞 6 要素與多輪微調",
+                points: [
+                  "【步驟一：問題定義】開始前先答 5 問：我要做什麼（形式）？給誰看（受眾）？想達成什麼（目的）？要什麼風格？有哪些限制？",
+                  "【步驟二：提示詞設計】好提示詞＝清楚內容＋清楚形式。六要素：主題、用途、風格、構圖、文字、限制。",
+                  "【提示詞優化】V1 初稿（基本描述） ➔ V2 補充條件（加色彩/版面/層級） ➔ V3 修正細節（換風格/補內容/修錯字），保存版本比較差異。"
+                ]
+              },
+              {
+                tag: "02 步驟三 & 四",
+                title: "判讀生成結果 × 人工修正把關",
+                points: [
+                  "【步驟三：判讀結果】不是能看就好，要能用才行！檢查是否符合目標受眾、文字是否無錯字、視覺層級是否清楚、圖像有無失真或怪異細節。",
+                  "【步驟四：人工修正】真正的設計品質來自人類把關！①修文案（錯字/語句/事實查核） ②調版面（對齊/留白/層級） ③統一風格 ④補足脈絡（來源/行動提示）。"
+                ]
+              },
+              {
+                tag: "03 步驟五 & 最終檢核",
+                title: "完成最終成品與五大終極檢核指標",
+                points: [
+                  "【步驟五：最終成品】依用途（海報/簡報/社群圖/學習單）檢查尺寸（3:2、A4、1:1、16:9），選擇 PNG/JPG/PDF/MP4 格式，並補上署名、來源與 AI 使用說明。",
+                  "【最終 5 大檢核】✔清楚（內容易懂） ✔正確（資訊無誤） ✔美觀（視覺專業） ✔合法（尊重著作權與規範） ✔可用（符合實際需求）。"
+                ]
+              }
+            ]
+          },
+          {
+            code: "單元 9-2",
+            title: "口頭發表與視覺提案：設計理念、AI 策略與修正歷程",
+            coreEssence: "口頭發表不是背稿，而是引導觀眾看懂你的設計思考！用「設計理念、AI 使用策略、修正歷程」三大主軸展現專業價值。",
+            memoryHook: "先說背景與目的，再把理念連到視覺選擇，大方說明 AI 角色與你的修正歷程，故事最有說服力！",
+            flashcards: [
+              {
+                tag: "01 發表三主軸與開場",
+                title: "口頭發表 4 順序與背景破題",
+                points: [
+                  "建議發表 4 順序：①作品背景（做什麼/為誰做/想解決什麼） ➔ ②設計理念（為什麼這樣設計） ➔ ③AI 協作過程 ➔ ④修正與成果反思。",
+                  "開場一句話模板：「我的作品主題是＿＿，主要對象是＿＿，希望透過這個設計達到＿＿。」",
+                  "設計理念要連到「看得見的視覺選擇」：說明核心概念與情緒如何反映在色彩、字體、圖示與構圖上。"
+                ]
+              },
+              {
+                tag: "02 說明 AI 策略",
+                title: "說出 AI 的角色，更要說出「誰在做判斷」",
+                points: [
+                  "大方分享 AI 協助階段（發想、關鍵字探索、圖像草圖、文案整理、版面建議）與提示詞五要素（先粗後細、多輪修正）。",
+                  "強調「你的角色」：①篩選結果 ②判斷品質 ③整合內容 ④做最後決策。",
+                  "金句範例：「AI 幫我快速產出不同版本，但最終方向、取捨與品質仍由我的審美與判斷決定！」"
+                ]
+              },
+              {
+                tag: "03 修正歷程與台風",
+                title: "修正歷程最有說服力 × 自然發表 5 技巧",
+                points: [
+                  "【初稿 V1 ➔ V2 ➔ 最終版】分享發現的問題（字太小、資訊太擠、重點分散、配色不穩、圖示不一）與修正做法（刪減文字、重整層級、統一配色），展示前後對比！",
+                  "【自然發表 5 技巧】①看著觀眾建立連結 ②語速放慢 ③每次只講一個重點 ④語氣自然用自己的話 ⑤適度手勢輔助。"
+                ]
+              }
+            ]
+          }
+        ],
+        comparisons: [
+          {
+            aspect: "成果發表的敘事方式",
+            good: "先交代受眾與目的，說明為何選擇藍紫科技配色，並展示從初稿 V1（文字過多、配色混亂）修改到最終版的對比歷程。",
+            bad: "上台低頭死背講稿，只說「這張圖是我用 AI 做的，我覺得很好看」，說不出設計理由與修改過程。"
+          },
+          {
+            aspect: "面對 AI 協作的說明態度",
+            good: "誠實且自信地說明如何運用「先粗後細、多輪微調」提示詞讓 AI 加速起草，並展示人工查核與排版精修的專業價值。",
+            bad: "隱瞞使用 AI 或完全交由 AI 生成卻不檢查錯字與怪異細節，被提問「為什麼這樣設計」時答不出來。"
+          }
+        ],
+        quiz: [
+          {
+            q: "根據單元 9-1，AIGC 視覺設計流程的核心公式與實務心法為何？",
+            options: [
+              "完全交給 AI 自動生成，人類不需要介入任何步驟",
+              "AIGC 設計 = 人類判斷 × AI 生成 × 反覆優化（先想清楚 ➔ 說清楚 ➔ 看清楚 ➔ 修清楚）",
+              "只要買最貴的電腦硬體就能自動做出好設計",
+              "先排版輸出 ➔ 再開始想主題與受眾是誰"
+            ],
+            ans: 1,
+            exp: "教材 9-1 核心觀念：「AIGC 設計 = 人類判斷 × AI 生成 × 反覆優化」，遵循「問題定義 ➔ 提示詞 ➔ 生成結果 ➔ 人工修正 ➔ 最終成品」。"
+          },
+          {
+            q: "在進行專題作品「口頭發表（單元 9-2）」時，為什麼教材強調展示「初稿 V1 到最終版的修正歷程」非常有說服力？",
+            options: [
+              "因為可以湊滿報告時間",
+              "能具體向觀眾證明你具備「發現問題（如字太小、重點分散）並透過專業設計判斷解決問題」的能力",
+              "為了證明 AI 軟體非常難用",
+              "因為初稿通常比最終版更好看"
+            ],
+            ans: 1,
+            exp: "教材 9-2（Flashcard 07 & 08）指出：第一版不是終點而是找問題的起點！把「怎麼改、為什麼改」並搭配前後對比說給觀眾聽，最能展現設計思考價值。"
+          }
+        ]
+      }
+    ];
+
+    /********************************************************************
+     * 2. STATE MANAGEMENT (Progress, Active Island, XP, Quiz State)
+     ********************************************************************/
+    const state = {
+      activeIslandId: null,
+      activeSubUnitIdx: 0,
+      activeDrawerTab: 'learn', // 'learn' | 'compare' | 'lab' | 'quiz'
+      xp: 0,
+      masteredIslands: new Set(), // stores island IDs (1..9)
+      quizAnswers: {}, // key: `${islandId}-${qIdx}`, value: selectedOptionIdx
+      autoTour: false,
+      autoTourIdx: 0,
+      autoTourTimer: null,
+      // Mini-lab state
+      promptBuilder: {
+        role: "科普教育與視覺創作者",
+        topic: "校園減塑與海洋保育",
+        audience: "高中生與年輕社群族群",
+        format: "4 張連續知識圖卡 (4:5 直式)",
+        style: "清爽現代扁平插畫、海洋藍與生態綠配色",
+        constraint: "每張只講 1 個重點、標題 12 字內、附可追溯來源與行動提示"
+      },
+      chartMatcherIdx: 0,
+      chartMatcherScore: 0,
+      cardInspectorFixes: {
+        title: false,
+        contrast: false,
+        hierarchy: false,
+        icons: false,
+        source: false,
+        cta: false
+      }
+    };
+
+    /********************************************************************
+     * 3. THREE.JS 3D ARCHIPELAGO SCENE SETUP
+     ********************************************************************/
+    let scene, camera, renderer, raycaster, mouse;
+    let islandMeshes = []; // clickable island hitboxes & groups
+    let islandGroups = {}; // map id -> THREE.Group
+    let animatedObjects = [];
+    let oceanMesh, particleSystem;
+
+    // Camera orbit & smooth target interpolation
+    const camControl = {
+      isDragging: false,
+      prevX: 0,
+      prevY: 0,
+      spherical: { radius: 82, phi: Math.PI / 3.1, theta: 0.25 },
+      targetSpherical: { radius: 82, phi: Math.PI / 3.1, theta: 0.25 },
+      lookAtPos: new THREE.Vector3(0, 4, 0),
+      targetLookAt: new THREE.Vector3(0, 4, 0)
+    };
+
+    function initThreeScene() {
+      const container = document.getElementById('canvas-container');
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x070b19, 0.0055);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.75);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+      dirLight.position.set(45, 80, 50);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      scene.add(dirLight);
+
+      const pointLightCenter = new THREE.PointLight(0x818cf8, 1.5, 90);
+      pointLightCenter.position.set(0, 20, 0);
+      scene.add(pointLightCenter);
+
+      // Stylized Shimmering Ocean Grid & Waves
+      createStylizedOcean();
+
+      // Floating Star/Data Particles
+      createDataParticles();
+
+      // Build All 9 Thematic Islands & Connecting Bridges
+      buildArchipelagoIslands();
+      buildConnectingBridges();
+
+      // Create Floating HTML Labels for each Island
+      createIslandHtmlLabels();
+
+      // Event Listeners for Camera & Raycasting
+      setupInteractionEvents(renderer.domElement);
+      window.addEventListener('resize', onWindowResize);
+
+      // Start Animation Loop
+      animateScene();
+    }
+
+    function createStylizedOcean() {
+      const geo = new THREE.PlaneGeometry(320, 320, 48, 48);
+      geo.rotateX(-Math.PI / 2);
+
+      // Store original vertices for wave animation
+      const posAttr = geo.attributes.position;
+      const baseHeights = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        baseHeights.push(posAttr.getY(i));
+      }
+      geo.userData.baseHeights = baseHeights;
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x0b1528,
+        emissive: 0x091936,
+        emissiveIntensity: 0.4,
+        roughness: 0.25,
+        metalness: 0.6,
+        wireframe: false,
+        flatShading: true
+      });
+
+      oceanMesh = new THREE.Mesh(geo, mat);
+      oceanMesh.position.y = -4.5;
+      oceanMesh.receiveShadow = true;
+      scene.add(oceanMesh);
+
+      // Subtle glowing polar grid on the water surface
+      const gridHelper = new THREE.PolarGridHelper(110, 16, 8, 64, 0x1e3a8a, 0x1e293b);
+      gridHelper.position.y = -4.1;
+      scene.add(gridHelper);
+    }
+
+    function createDataParticles() {
+      const count = 260;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 160;
+        positions[i * 3 + 1] = Math.random() * 45 - 2;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 160;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({
+        color: 0x67e8f9,
+        size: 0.65,
+        transparent: true,
+        opacity: 0.65
+      });
+      particleSystem = new THREE.Points(geo, mat);
+      scene.add(particleSystem);
+    }
+
+    function buildArchipelagoIslands() {
+      ISLANDS_DATA.forEach((isl) => {
+        const group = new THREE.Group();
+        group.position.set(isl.position.x, isl.position.y, isl.position.z);
+        group.userData = { islandId: isl.id };
+
+        const themeColor = new THREE.Color(isl.color);
+
+        // 1. Stylized Low-Poly Floating Rock Base (Inverted Cone + Cylinder Platform)
+        const rockGeo = new THREE.ConeGeometry(6.8, 6.5, 7);
+        rockGeo.rotateX(Math.PI);
+        const rockMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          roughness: 0.8,
+          flatShading: true
+        });
+        const rockMesh = new THREE.Mesh(rockGeo, rockMat);
+        rockMesh.position.y = -3.2;
+        rockMesh.castShadow = true;
+        group.add(rockMesh);
+
+        // Top Turf Platform
+        const topGeo = new THREE.CylinderGeometry(7.2, 6.6, 1.4, 7);
+        const topMat = new THREE.MeshStandardMaterial({
+          color: 0x0f172a,
+          emissive: themeColor,
+          emissiveIntensity: 0.22,
+          roughness: 0.4,
+          flatShading: true
+        });
+        const topMesh = new THREE.Mesh(topGeo, topMat);
+        topMesh.position.y = 0.2;
+        topMesh.receiveShadow = true;
+        topMesh.userData = { islandId: isl.id };
+        group.add(topMesh);
+        islandMeshes.push(topMesh);
+
+        // Glowing Ring around Island Base
+        const ringGeo = new THREE.RingGeometry(7.5, 8.1, 32);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: themeColor,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.55
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.y = 0.3;
+        group.add(ringMesh);
+        group.userData.ringMesh = ringMesh;
+
+        // 2. Thematic 3D Monument per Island
+        const monumentGroup = createIslandMonument(isl.id, themeColor);
+        monumentGroup.position.y = 1.2;
+        // Make monument clickable too
+        monumentGroup.traverse((child) => {
+          if (child.isMesh) {
+            child.userData = { islandId: isl.id };
+            islandMeshes.push(child);
+          }
+        });
+        group.add(monumentGroup);
+        group.userData.monument = monumentGroup;
+
+        // Add subtle trees/crystals around platform
+        for (let i = 0; i < 3; i++) {
+          const angle = (i * Math.PI * 2) / 3 + 0.4;
+          const crystalGeo = new THREE.OctahedronGeometry(0.65, 0);
+          const crystalMat = new THREE.MeshStandardMaterial({
+            color: themeColor,
+            emissive: themeColor,
+            emissiveIntensity: 0.4,
+            flatShading: true
+          });
+          const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+          crystal.position.set(Math.cos(angle) * 5.2, 1.3, Math.sin(angle) * 5.2);
+          crystal.scale.y = 1.6;
+          group.add(crystal);
+        }
+
+        scene.add(group);
+        islandGroups[isl.id] = group;
+        animatedObjects.push({ group, monument: monumentGroup, baseY: isl.position.y, phase: isl.id * 0.7 });
+      });
+    }
+
+    // Build custom 3D procedural monument for each of the 9 islands
+    function createIslandMonument(id, color) {
+      const mGroup = new THREE.Group();
+      const matPrimary = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.35,
+        roughness: 0.3,
+        metalness: 0.3,
+        flatShading: true
+      });
+      const matWhite = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.2,
+        metalness: 0.1
+      });
+      const matGold = new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        emissive: 0xca8a04,
+        emissiveIntensity: 0.4,
+        roughness: 0.2,
+        metalness: 0.7
+      });
+
+      if (id === 1) {
+        // Island 1: AI Robot Head + Ethics Shield
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 2.2, 8), matWhite);
+        body.position.y = 1.1;
+        const head = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 2.0), matWhite);
+        head.position.y = 3.3;
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 0.2), matPrimary);
+        visor.position.set(0, 3.3, 1.0);
+        const shield = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 0.8, 0.3, 6), matPrimary);
+        shield.rotation.x = Math.PI / 2;
+        shield.position.set(1.8, 2.0, 1.2);
+        mGroup.add(body, head, visor, shield);
+      } else if (id === 2) {
+        // Island 2: Logo Geometric Monoliths (Circle, Triangle, Square)
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 1.8), matPrimary);
+        box.position.set(-1.6, 1.2, 0);
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.5, 4), matGold);
+        cone.position.set(1.6, 1.5, 0);
+        const torus = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.4, 12, 24), matWhite);
+        torus.position.set(0, 3.6, 0);
+        mGroup.add(box, cone, torus);
+      } else if (id === 3) {
+        // Island 3: Color Wheel Prism & 3x3 Composition Frame
+        const prism = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.6, 3), matPrimary);
+        prism.position.y = 2.0;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.8, 0.22, 8, 24), matGold);
+        ring.position.y = 2.4;
+        mGroup.add(prism, ring);
+      } else if (id === 4) {
+        // Island 4: 3D Rising Bar Charts & Pie Ring
+        const b1 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), matWhite);
+        b1.position.set(-1.8, 0.9, 0);
+        const b2 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.0, 1.1), matPrimary);
+        b2.position.set(0, 1.5, 0);
+        const b3 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 4.4, 1.1), matGold);
+        b3.position.set(1.8, 2.2, 0);
+        mGroup.add(b1, b2, b3);
+      } else if (id === 5) {
+        // Island 5: AI Command Tower & Checklist Floating Panels
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.5, 3.8, 6), matPrimary);
+        tower.position.y = 1.9;
+        const card1 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.8, 0.2), matWhite);
+        card1.position.set(-2.2, 2.6, 1.0);
+        card1.rotation.y = 0.35;
+        const card2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.8, 0.2), matGold);
+        card2.position.set(2.2, 2.6, 1.0);
+        card2.rotation.y = -0.35;
+        mGroup.add(tower, card1, card2);
+      } else if (id === 6) {
+        // Island 6: 6 Interlocking Modular Card Blocks
+        for (let i = 0; i < 4; i++) {
+          const card = new THREE.Mesh(
+            new THREE.BoxGeometry(2.2, 1.4, 0.35),
+            i % 2 === 0 ? matPrimary : matWhite
+          );
+          card.position.set((i - 1.5) * 1.1, 1.2 + i * 0.9, (i % 2) * 0.6);
+          mGroup.add(card);
+        }
+      } else if (id === 7) {
+        // Island 7: 1:1, 4:5, 9:16 Social Media Frames
+        const f1 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 0.25), matWhite);
+        f1.position.set(-2.3, 1.6, 0);
+        const f2 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.6, 0.25), matPrimary);
+        f2.position.set(0, 2.0, 0.5);
+        const f3 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3.4, 0.25), matGold);
+        f3.position.set(2.3, 2.4, 0);
+        mGroup.add(f1, f2, f3);
+      } else if (id === 8) {
+        // Island 8: Central Brand Hub & Orbiting Satellites
+        const core = new THREE.Mesh(new THREE.OctahedronGeometry(1.8, 0), matPrimary);
+        core.position.y = 2.6;
+        mGroup.add(core);
+        for (let i = 0; i < 4; i++) {
+          const a = (i * Math.PI) / 2;
+          const sat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.2), matWhite);
+          sat.position.set(Math.cos(a) * 3.0, 2.6, Math.sin(a) * 3.0);
+          sat.lookAt(0, 2.6, 0);
+          mGroup.add(sat);
+        }
+      } else if (id === 9) {
+        // Island 9: Grand Designer Temple (5 Pillars + Golden Crown Star)
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 8), matWhite);
+        base.position.y = 0.4;
+        mGroup.add(base);
+        for (let i = 0; i < 5; i++) {
+          const a = (i * Math.PI * 2) / 5;
+          const p = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 3.4, 8), matWhite);
+          p.position.set(Math.cos(a) * 2.8, 2.1, Math.sin(a) * 2.8);
+          mGroup.add(p);
+        }
+        const crown = new THREE.Mesh(new THREE.OctahedronGeometry(1.7, 0), matGold);
+        crown.position.y = 4.6;
+        mGroup.add(crown);
+      }
+
+      return mGroup;
+    }
+
+    function buildConnectingBridges() {
+      for (let i = 0; i < ISLANDS_DATA.length - 1; i++) {
+        const p1 = ISLANDS_DATA[i].position;
+        const p2 = ISLANDS_DATA[i + 1].position;
+
+        const start = new THREE.Vector3(p1.x, p1.y + 0.5, p1.z);
+        const end = new THREE.Vector3(p2.x, p2.y + 0.5, p2.z);
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        mid.y += 3.2; // arch height
+
+        const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+        const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.18, 8, false);
+        const tubeMat = new THREE.MeshBasicMaterial({
+          color: 0x6366f1,
+          transparent: true,
+          opacity: 0.45
+        });
+        const bridge = new THREE.Mesh(tubeGeo, tubeMat);
+        scene.add(bridge);
+      }
+    }
+
+    /********************************************************************
+     * 4. FLOATING HTML LABELS & BOTTOM DOCK RENDERING
+     ********************************************************************/
+    const labelElements = {};
+
+    function createIslandHtmlLabels() {
+      const container = document.getElementById('labels-container');
+      container.innerHTML = '';
+
+      ISLANDS_DATA.forEach((isl) => {
+        const el = document.createElement('div');
+        el.className = 'island-label group';
+        el.onclick = () => selectIsland(isl.id);
+        el.innerHTML = `
+          <div class="flex flex-col items-center">
+            <div id="label-pill-${isl.id}" class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-600/80 shadow-xl backdrop-blur-md flex items-center gap-2 transition-all group-hover:border-indigo-400">
+              <span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs text-white font-black shadow" style="background:${isl.color}">
+                ${isl.id}
+              </span>
+              <div class="text-left">
+                <div class="text-[10px] font-bold text-slate-400 leading-none">${isl.unitRange}</div>
+                <div class="text-xs font-black text-white whitespace-nowrap">${isl.name}</div>
+              </div>
+              <i id="label-check-${isl.id}" class="fa-solid fa-circle-check text-emerald-400 text-xs hidden"></i>
+            </div>
+            <div class="w-0.5 h-3 bg-gradient-to-b from-slate-400 to-transparent"></div>
+          </div>
+        `;
+        container.appendChild(el);
+        labelElements[isl.id] = el;
+      });
+    }
+
+    function renderBottomDock() {
+      const dock = document.getElementById('dock-buttons');
+      dock.innerHTML = ISLANDS_DATA.map((isl) => {
+        const isSelected = state.activeIslandId === isl.id;
+        const isMastered = state.masteredIslands.has(isl.id);
+        return `
+          <button onclick="selectIsland(${isl.id})"
+            class="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition-all border ${
+              isSelected
+                ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-500/30 scale-105'
+                : 'bg-slate-800/75 hover:bg-slate-700/80 text-slate-200 border-slate-700'
+            }">
+            <span class="w-5 h-5 rounded-md flex items-center justify-center text-[11px] text-white font-black" style="background:${isl.color}">
+              ${isl.id}
+            </span>
+            <span>${isl.shortTitle.split('. ')[1]}</span>
+            ${isMastered ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : ''}
+          </button>
+        `;
+      }).join('');
+    }
+
+    /********************************************************************
+     * 5. CAMERA INTERACTION & ANIMATION LOOP
+     ********************************************************************/
+    function setupInteractionEvents(domElement) {
+      let pointerDownPos = { x: 0, y: 0 };
+
+      domElement.addEventListener('pointerdown', (e) => {
+        camControl.isDragging = true;
+        camControl.prevX = e.clientX;
+        camControl.prevY = e.clientY;
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!camControl.isDragging) return;
+        const dx = e.clientX - camControl.prevX;
+        const dy = e.clientY - camControl.prevY;
+        camControl.prevX = e.clientX;
+        camControl.prevY = e.clientY;
+
+        camControl.targetSpherical.theta -= dx * 0.006;
+        camControl.targetSpherical.phi = Math.max(
+          0.25,
+          Math.min(Math.PI / 2.2, camControl.targetSpherical.phi - dy * 0.006)
+        );
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        if (!camControl.isDragging) return;
+        camControl.isDragging = false;
+        const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (dist < 6) {
+          handleCanvasClick(e);
+        }
+      });
+
+      window.addEventListener('pointercancel', () => { camControl.isDragging = false; });
+      domElement.style.touchAction = 'none';
+      domElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camControl.targetSpherical.radius = Math.max(
+          22,
+          Math.min(135, camControl.targetSpherical.radius + e.deltaY * 0.05)
+        );
+      }, { passive: false });
+    }
+
+    function handleCanvasClick(e) {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(islandMeshes, true);
+      if (intersects.length > 0) {
+        const hitId = intersects[0].object.userData.islandId;
+        if (hitId) {
+          selectIsland(hitId);
+        }
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    let clock = new THREE.Clock();
+
+    function animateScene() {
+      requestAnimationFrame(animateScene);
+      if (document.hidden) return;
+      const elapsed = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : clock.getElapsedTime();
+
+      // 1. Animate Ocean Waves
+      if (oceanMesh) {
+        const pos = oceanMesh.geometry.attributes.position;
+        const base = oceanMesh.geometry.userData.baseHeights;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const z = pos.getZ(i);
+          const wave = Math.sin(x * 0.08 + elapsed * 1.4) * 0.45 + Math.cos(z * 0.08 + elapsed * 1.1) * 0.45;
+          pos.setY(i, base[i] + wave);
+        }
+        pos.needsUpdate = true;
+      }
+
+      // 2. Bobbing Islands & Rotating Monuments
+      animatedObjects.forEach((item) => {
+        item.group.position.y = item.baseY + Math.sin(elapsed * 1.5 + item.phase) * 0.45;
+        item.monument.rotation.y = elapsed * 0.55 + item.phase;
+      });
+
+      // 3. Slowly rotate data particles
+      if (particleSystem) {
+        particleSystem.rotation.y = elapsed * 0.03;
+      }
+
+      // 4. Smoothly interpolate Camera Position & Target
+      camControl.spherical.radius += (camControl.targetSpherical.radius - camControl.spherical.radius) * 0.08;
+      camControl.spherical.phi += (camControl.targetSpherical.phi - camControl.spherical.phi) * 0.08;
+      camControl.spherical.theta += (camControl.targetSpherical.theta - camControl.spherical.theta) * 0.08;
+      camControl.lookAtPos.lerp(camControl.targetLookAt, 0.08);
+
+      const r = camControl.spherical.radius;
+      const phi = camControl.spherical.phi;
+      const theta = camControl.spherical.theta;
+
+      camera.position.x = camControl.lookAtPos.x + r * Math.sin(phi) * Math.sin(theta);
+      camera.position.y = camControl.lookAtPos.y + r * Math.cos(phi);
+      camera.position.z = camControl.lookAtPos.z + r * Math.sin(phi) * Math.cos(theta);
+      camera.lookAt(camControl.lookAtPos);
+
+      // 5. Project 3D Island Positions to 2D Screen Labels
+      updateHtmlLabels();
+
+      renderer.render(scene, camera);
+    }
+
+    function updateHtmlLabels() {
+      const tempV = new THREE.Vector3();
+      ISLANDS_DATA.forEach((isl) => {
+        const grp = islandGroups[isl.id];
+        const el = labelElements[isl.id];
+        if (!grp || !el) return;
+
+        tempV.copy(grp.position);
+        tempV.y += 7.2; // above monument
+        tempV.project(camera);
+
+        // Check if behind camera
+        if (tempV.z > 1) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(tempV.y * 0.5) + 0.5) * window.innerHeight;
+
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.style.opacity = '1';
+        el.style.pointerEvents = 'auto';
+      });
+    }
+
+    /********************************************************************
+     * 6. ISLAND SELECTION, CAMERA FLY-TO & DRAWER RENDERING
+     ********************************************************************/
+    function selectIsland(id) {
+      const island = ISLANDS_DATA.find((x) => x.id === id);
+      if (!island) return;
+
+      state.activeIslandId = id;
+      state.activeSubUnitIdx = 0;
+
+      // Fly camera to focus on the selected island
+      // Offset lookAt slightly on desktop so island is visible on the left of the drawer
+      const isDesktop = window.innerWidth >= 768;
+      camControl.targetLookAt.set(
+        island.position.x + (isDesktop ? 8 : 0),
+        island.position.y + 2,
+        island.position.z
+      );
+      camControl.targetSpherical.radius = 34;
+      camControl.targetSpherical.phi = Math.PI / 3.2;
+
+      // Open Drawer
+      const drawer = document.getElementById('island-drawer');
+      drawer.classList.remove('translate-x-full');
+
+      renderDrawerHeader(island);
+      renderDrawerBody(island);
+      renderBottomDock();
+    }
+
+    function closeIslandDrawer() {
+      state.activeIslandId = null;
+      const drawer = document.getElementById('island-drawer');
+      drawer.classList.add('translate-x-full');
+      renderBottomDock();
+    }
+
+    function resetCameraOverview() {
+      stopAutoTour();
+      closeIslandDrawer();
+      camControl.targetLookAt.set(0, 4, 0);
+      camControl.targetSpherical.radius = 85;
+      camControl.targetSpherical.phi = Math.PI / 3.1;
+    }
+
+    function navigateRelativeIsland(dir) {
+      const current = state.activeIslandId || 1;
+      let next = current + dir;
+      if (next < 1) next = ISLANDS_DATA.length;
+      if (next > ISLANDS_DATA.length) next = 1;
+      selectIsland(next);
+    }
+
+    function toggleAutoTour() {
+      if (state.autoTour) {
+        stopAutoTour();
+      } else {
+        state.autoTour = true;
+        document.getElementById('tour-btn-text').textContent = '停止巡航';
+        document.getElementById('btn-auto-tour').classList.add('bg-cyan-500/30', 'border-cyan-400');
+        state.autoTourIdx = (state.activeIslandId ? state.activeIslandId - 1 : 0);
+        selectIsland(ISLANDS_DATA[state.autoTourIdx].id);
+        state.autoTourTimer = setInterval(() => {
+          state.autoTourIdx = (state.autoTourIdx + 1) % ISLANDS_DATA.length;
+          selectIsland(ISLANDS_DATA[state.autoTourIdx].id);
+        }, 5500);
+      }
+    }
+
+    function stopAutoTour() {
+      state.autoTour = false;
+      if (state.autoTourTimer) clearInterval(state.autoTourTimer);
+      document.getElementById('tour-btn-text').textContent = '環島巡航';
+      document.getElementById('btn-auto-tour').classList.remove('bg-cyan-500/30', 'border-cyan-400');
+    }
+
+    function switchDrawerTab(tab) {
+      state.activeDrawerTab = tab;
+      ['learn', 'compare', 'lab', 'quiz'].forEach((t) => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (t === tab) {
+          btn.className = 'drawer-tab-btn py-2 px-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all bg-indigo-600 text-white shadow';
+        } else {
+          btn.className = 'drawer-tab-btn py-2 px-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:text-white';
+        }
+      });
+      const island = ISLANDS_DATA.find((x) => x.id === state.activeIslandId);
+      if (island) renderDrawerBody(island);
+    }
+
+    function switchSubUnit(idx) {
+      state.activeSubUnitIdx = idx;
+      const island = ISLANDS_DATA.find((x) => x.id === state.activeIslandId);
+      if (island) renderDrawerBody(island);
+    }
+
+    function renderDrawerHeader(island) {
+      const iconBox = document.getElementById('drawer-icon-box');
+      iconBox.style.background = `linear-gradient(135deg, ${island.color}, #1e1b4b)`;
+      document.getElementById('drawer-icon').className = `fa-solid ${island.icon} text-white`;
+      document.getElementById('drawer-book-badge').textContent = island.book;
+      document.getElementById('drawer-unit-range').textContent = island.unitRange;
+      document.getElementById('drawer-title').textContent = `第 ${island.id} 島：${island.name}`;
+      document.getElementById('drawer-footer-indicator').textContent = `島嶼 ${island.id} / ${ISLANDS_DATA.length}`;
+
+      const statusBadge = document.getElementById('drawer-status-badge');
+      if (state.masteredIslands.has(island.id)) {
+        statusBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
+        statusBadge.innerHTML = '<i class="fa-solid fa-check mr-1"></i>已精通此島';
+      } else {
+        statusBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+        statusBadge.textContent = '挑戰測驗可解鎖徽章';
+      }
+    }
+
+    function renderDrawerBody(island) {
+      const body = document.getElementById('drawer-body');
+
+      if (state.activeDrawerTab === 'learn') {
+        const sub = island.subUnits[state.activeSubUnitIdx];
+        body.innerHTML = `
+          <!-- Sub-Unit Switcher Pills -->
+          <div class="grid grid-cols-2 gap-2.5">
+            ${island.subUnits.map((u, idx) => `
+              <button onclick="switchSubUnit(${idx})"
+                class="p-3 rounded-2xl border text-left transition-all ${
+                  idx === state.activeSubUnitIdx
+                    ? 'bg-indigo-600/25 border-indigo-400 shadow-lg shadow-indigo-500/10'
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-black px-2 py-0.5 rounded-md ${idx === state.activeSubUnitIdx ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'}">${u.code}</span>
+                  <i class="fa-solid fa-circle-chevron-right text-xs ${idx === state.activeSubUnitIdx ? 'text-indigo-400' : 'text-slate-600'}"></i>
+                </div>
+                <div class="text-xs sm:text-sm font-bold text-white mt-1.5 line-clamp-1">${u.title.split('：')[1] || u.title}</div>
+              </button>
+            `).join('')}
+          </div>
+
+          <!-- Core Essence Banner -->
+          <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/50 to-slate-900 border border-indigo-500/30 space-y-3">
+            <div class="flex items-center gap-2 text-xs font-bold text-indigo-300">
+              <i class="fa-solid fa-bullseye"></i>
+              <span>${sub.code} 核心精要導讀</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-black text-white leading-snug">${sub.title}</h3>
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">${sub.coreEssence}</p>
+            <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-start gap-2.5">
+              <i class="fa-solid fa-star text-amber-400 mt-0.5"></i>
+              <div class="text-xs sm:text-sm font-bold text-amber-200">
+                <span class="text-amber-400 font-black">★ 一句話記憶：</span>${sub.memoryHook}
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Flashcards List -->
+          <div class="space-y-3.5">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-black text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-cyan-400"></i>教材重點知識閃卡（Knowledge Flashcards）
+              </h4>
+              <span class="text-xs text-slate-400">共 ${sub.flashcards.length} 張核心卡</span>
+            </div>
+
+            ${sub.flashcards.map((fc, i) => `
+              <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 transition-all space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                    Flashcard 0${i + 1}｜${fc.tag}
+                  </span>
+                </div>
+                <h5 class="text-base font-black text-white">${fc.title}</h5>
+                <ul class="space-y-2 pt-1">
+                  ${fc.points.map((pt) => `
+                    <li class="text-xs sm:text-sm text-slate-300 flex items-start gap-2.5 leading-relaxed">
+                      <i class="fa-solid fa-circle-check text-indigo-400 mt-1 shrink-0 text-xs"></i>
+                      <span>${pt}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Call to Action to Try Mini-Lab or Quiz -->
+          <div class="p-4 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="text-xs sm:text-sm text-indigo-200 font-medium">
+              讀完本單元閃卡了嗎？立即體驗互動演練或挑戰島嶼測驗拿積分！
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="switchDrawerTab('lab')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-300 border border-cyan-500/30">
+                <i class="fa-solid fa-flask mr-1"></i>實戰演練
+              </button>
+              <button onclick="switchDrawerTab('quiz')" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow">
+                <i class="fa-solid fa-trophy mr-1"></i>闖關測驗
+              </button>
+            </div>
+          </div>
+        `;
+      } else if (state.activeDrawerTab === 'compare') {
+        body.innerHTML = `
+          <div class="space-y-4">
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <h3 class="text-base font-black text-white flex items-center gap-2">
+                <i class="fa-solid fa-scale-balanced text-amber-400"></i>
+                案例情境與設計檢驗：優良實踐 vs 常見誤區
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">對照教材中的「✔ 優良設計實踐（Best Practices）」與「✖ 常見誤區與修正（Pitfalls & Fixes）」，培養專業設計師的審美把關力。</p>
+            </div>
+
+            ${island.comparisons.map((cmp, idx) => `
+              <div class="rounded-2xl bg-slate-900/75 border border-slate-800 overflow-hidden">
+                <div class="px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/70 flex items-center justify-between">
+                  <span class="text-xs font-black text-indigo-300">檢驗維度 0${idx + 1}：${cmp.aspect}</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-800">
+                  <!-- Best Practice -->
+                  <div class="p-4 bg-emerald-950/20 space-y-2">
+                    <div class="inline-flex items-center gap-1.5 text-xs font-black text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                      <i class="fa-solid fa-check"></i>優良設計實踐 (Best Practice)
+                    </div>
+                    <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">${cmp.good}</p>
+                  </div>
+                  <!-- Pitfall -->
+                  <div class="p-4 bg-rose-950/20 space-y-2">
+                    <div class="inline-flex items-center gap-1.5 text-xs font-black text-rose-400 bg-rose-500/15 px-2.5 py-1 rounded-full border border-rose-500/30">
+                      <i class="fa-solid fa-xmark"></i>常見誤區與雷區 (Pitfall)
+                    </div>
+                    <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">${cmp.bad}</p>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+
+            <!-- Universal 3 Golden Standards from Textbook -->
+            <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+              <h4 class="text-xs font-black uppercase tracking-wider text-slate-400">全教材共通三大專業檢驗標準</h4>
+              <div class="space-y-2 text-xs sm:text-sm">
+                <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-2.5">
+                  <span class="text-emerald-400 font-black">✔ 關鍵 3 秒法則：</span>
+                  <span class="text-slate-300">明確以核心目標為導向，維持畫面視覺焦點集中，讓讀者在 3 秒內理解核心意圖。</span>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-2.5">
+                  <span class="text-emerald-400 font-black">✔ 階層與呼吸感：</span>
+                  <span class="text-slate-300">嚴格遵循字級階層與色彩規範，透過明暗對比與留白營造舒適的版面節奏感。</span>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-2.5">
+                  <span class="text-emerald-400 font-black">✔ 人機協作主導：</span>
+                  <span class="text-slate-300">將 AI 與工具視為加速助手，始終由設計師主導最終的美學選擇、事實查證與邏輯校對。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (state.activeDrawerTab === 'lab') {
+        renderMiniLabInsideContainer(body, island.labType);
+      } else if (state.activeDrawerTab === 'quiz') {
+        renderQuizInsideContainer(body, island);
+      }
+    }
+
+    /********************************************************************
+     * 7. INTERACTIVE MINI-LABS (Prompt Builder, Chart Matcher, Inspector)
+     ********************************************************************/
+    function renderMiniLabInsideContainer(container, labType) {
+      if (labType === 'prompt') {
+        container.innerHTML = getPromptBuilderHTML();
+      } else if (labType === 'chart') {
+        container.innerHTML = getChartMatcherHTML();
+      } else {
+        container.innerHTML = getCardInspectorHTML();
+      }
+    }
+
+    // LAB 1: AI Prompt & Card Script Builder (Units 1-1, 2-2, 6-2, 9-1)
+    function getPromptBuilderHTML() {
+      const pb = state.promptBuilder;
+      return `
+        <div class="space-y-4">
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-cyan-950/60 border border-indigo-500/30">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-cyan-300 uppercase tracking-wider"><i class="fa-solid fa-terminal mr-1"></i>實戰演練工坊 A</span>
+              <span class="text-[11px] text-slate-300">對應單元：1-1、2-2、6-2、9-1</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-black text-white mt-1">AI 提示詞與連續圖卡腳本組裝器</h3>
+            <p class="text-xs text-slate-300 mt-0.5">實踐教材公式：「好提示詞 ＝ 清楚內容（主題/受眾）＋ 清楚形式（張數/風格/限制）」。點選下方參數，即時合成結構化 Prompt 與卡片地圖！</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-bold text-slate-300 block mb-1">1. 主題內容 (Topic)</label>
+              <select onchange="updatePromptParam('topic', this.value)" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white">
+                <option value="校園減塑與海洋保育" ${pb.topic === '校園減塑與海洋保育' ? 'selected' : ''}>校園減塑與海洋保育 (教材 6-2 示範)</option>
+                <option value="番茄工作法：25分鐘高效專注術" ${pb.topic === '番茄工作法：25分鐘高效專注術' ? 'selected' : ''}>番茄工作法：25分鐘專注術 (教材 6-2 示範)</option>
+                <option value="AI 使用規範：對抗幻覺與保護隱私" ${pb.topic === 'AI 使用規範：對抗幻覺與保護隱私' ? 'selected' : ''}>AI 使用規範：對抗幻覺與保護隱私 (教材 1-2)</option>
+                <option value="獨立咖啡品牌『晨光日常』視覺探索" ${pb.topic === '獨立咖啡品牌『晨光日常』視覺探索' ? 'selected' : ''}>獨立咖啡品牌『晨光日常』探索 (教材 2-1/2-2)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-300 block mb-1">2. 目標受眾 (Audience)</label>
+              <select onchange="updatePromptParam('audience', this.value)" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white">
+                <option value="高中生與年輕社群族群" ${pb.audience === '高中生與年輕社群族群' ? 'selected' : ''}>高中生與年輕社群族群（語氣活潑易懂）</option>
+                <option value="學校教師與教育工作者" ${pb.audience === '學校教師與教育工作者' ? 'selected' : ''}>學校教師與教育工作者（結構清晰嚴謹）</option>
+                <option value="關心永續生活的社會大眾" ${pb.audience === '關心永續生活的社會大眾' ? 'selected' : ''}>關心永續生活的社會大眾（溫暖具共鳴）</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-300 block mb-1">3. 輸出形式與比例 (Format)</label>
+              <select onchange="updatePromptParam('format', this.value)" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white">
+                <option value="4 張連續知識圖卡 (4:5 直式)" ${pb.format === '4 張連續知識圖卡 (4:5 直式)' ? 'selected' : ''}>4 張連續知識圖卡｜重點說明型 (4:5 直式)</option>
+                <option value="3 張連續知識圖卡 (1:1 方形)" ${pb.format === '3 張連續知識圖卡 (1:1 方形)' ? 'selected' : ''}>3 張連續知識圖卡｜概念解釋型 (1:1 方形)</option>
+                <option value="5 張連續知識圖卡 (9:16 限動)" ${pb.format === '5 張連續知識圖卡 (9:16 限動)' ? 'selected' : ''}>5 張連續知識圖卡｜問題解決型 (9:16 限動)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-300 block mb-1">4. 視覺風格與色調 (Style)</label>
+              <select onchange="updatePromptParam('style', this.value)" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white">
+                <option value="清爽現代扁平插畫、海洋藍與生態綠配色" ${pb.style === '清爽現代扁平插畫、海洋藍與生態綠配色' ? 'selected' : ''}>清爽現代扁平插畫（海洋藍＋生態綠）</option>
+                <option value="溫暖手繪文青風、大地木質柔和色調" ${pb.style === '溫暖手繪文青風、大地木質柔和色調' ? 'selected' : ''}>溫暖手繪文青風（大地木質柔和色調）</option>
+                <option value="未來感極簡科技風、深邃藍紫高對比配色" ${pb.style === '未來感極簡科技風、深邃藍紫高對比配色' ? 'selected' : ''}>未來感極簡科技風（深邃藍紫高對比）</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Generated Structured Prompt Box -->
+          <div class="p-4 rounded-2xl bg-slate-950 border border-cyan-500/40 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-cyan-400"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>組合完成之高精準度 Prompt：</span>
+              <button onclick="copyPromptText()" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold transition-colors">
+                <i class="fa-regular fa-copy mr-1"></i>複製提示詞
+              </button>
+            </div>
+            <p id="generated-prompt-text" class="text-xs sm:text-sm text-slate-100 leading-relaxed font-mono bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+              「請扮演專業的【${pb.role}】，針對【${pb.audience}】設計一組【${pb.format}】，主題為『${pb.topic}』。視覺風格設定為【${pb.style}】。每張圖卡腳本請明確列出：① 主標題（12字內）、② 副標題、③ 3 個精簡重點句（動詞開頭）、④ 圖像輔助建議、⑤ 底部引用來源與具體行動提示（CTA）。避免畫面文字過擠！」
+            </p>
+          </div>
+
+          <!-- Simulated Card Map Output -->
+          <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+            <div class="text-xs font-black text-indigo-300 flex items-center justify-between">
+              <span><i class="fa-solid fa-sitemap mr-1.5"></i>AI 生成之「卡片地圖（Card Map）」腳本預覽</span>
+              <span class="text-[11px] text-emerald-400">✔ 先排骨架，再補細節</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div class="font-black text-indigo-400 mb-1">Card 01｜導入破題</div>
+                <div class="font-bold text-white">${pb.topic.split('：')[0]}痛點</div>
+                <div class="text-[11px] text-slate-400 mt-1">3 秒吸睛主視覺＋核心提問引發共鳴</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div class="font-black text-cyan-400 mb-1">Card 02｜核心觀念</div>
+                <div class="font-bold text-white">為什麼這是關鍵？</div>
+                <div class="text-[11px] text-slate-400 mt-1">搭配比例圖或統計圖呈現關鍵數據</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div class="font-black text-emerald-400 mb-1">Card 03｜可行做法</div>
+                <div class="font-bold text-white">3 個立即可行步驟</div>
+                <div class="text-[11px] text-slate-400 mt-1">一致風格 Icon 圖示＋動詞開頭短句</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div class="font-black text-amber-400 mb-1">Card 04｜結論與行動</div>
+                <div class="font-bold text-white">從今天開始改變！</div>
+                <div class="text-[11px] text-slate-400 mt-1">附可追溯資料出處＋具體行動任務 CTA</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function updatePromptParam(key, val) {
+      state.promptBuilder[key] = val;
+      awardXP(15, "調整提示詞參數", "練習結構化 Prompt 工程");
+      refreshActiveLabViews();
+    }
+
+    function copyPromptText() {
+      const text = document.getElementById('generated-prompt-text')?.innerText || '';
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast("已複製結構化提示詞！", "可直接貼至 AI 工具進行實戰測試");
+    }
+
+    // LAB 2: Infographic Type Decision Matcher (Units 4-1, 5-1, 8-1)
+    const CHART_SCENARIOS = [
+      {
+        scenario: "情境 1：想比較「紙本書 vs 電子書」在價格、攜帶性與護眼程度的優缺點差異",
+        correct: "比較型",
+        hint: "想看差異與優缺點對決，幫助讀者做選擇！",
+        exp: "正解！【比較型圖表】（表格比較、對照卡片、A vs B）專門用來呈現兩個以上方案的差異與優缺點。"
+      },
+      {
+        scenario: "情境 2：想向新生說明「完成專題報告的 4 個步驟（找資料➔整理重點➔設計版面➔完成發表）」",
+        correct: "流程型",
+        hint: "想看一步一步的先後操作順序！",
+        exp: "正解！【流程型圖表】利用步驟編號、箭頭與流程框，讓複雜的操作流程瞬間一目了然。"
+      },
+      {
+        scenario: "情境 3：想呈現「校慶活動 9月規劃 ➔ 10月宣傳 ➔ 11月彩排 ➔ 12月正式活動」的時程演進",
+        correct: "時間軸",
+        hint: "跟年份、月份、事件先後發展歷程高度相關！",
+        exp: "正解！【時間軸圖表】透過時間節點與連線，理清歷史事件或專案時程的先後脈絡。"
+      },
+      {
+        scenario: "情境 4：想呈現「高中生一天時間分配（睡眠 35%、上課 30%、休閒 20%、其他 15%）」的部分與整體關係",
+        correct: "比例圖",
+        hint: "想看各個部分占整體的百分比大小！",
+        exp: "正解！【比例圖】（圓餅圖、甜甜圈圖、百分比條）能讓人一眼看出整體資源或時間的分配占比。"
+      },
+      {
+        scenario: "情境 5：想展示「臺灣北部、中部、南部、東部各地降雨量多寡的空間區域分布」",
+        correct: "地圖型",
+        hint: "資訊與地理位置、區域分布高度相關！",
+        exp: "正解！【地圖型圖表】結合地圖底圖、標記點與顏色分區，直觀呈現空間位置與區域差異。"
+      },
+      {
+        scenario: "情境 6：想呈現「班級 1 月到 6 月每月閱讀本數從 5 本穩定攀升到 24 本的成長趨勢」",
+        correct: "統計圖",
+        hint: "想比較數量大小並觀察隨時間變化的成長趨勢！",
+        exp: "正解！【統計圖】（長條圖結合折線圖）最能展現客觀數據的數量對比與變化趨勢。"
+      }
+    ];
+
+    function getChartMatcherHTML() {
+      const item = CHART_SCENARIOS[state.chartMatcherIdx];
+      const types = [
+        { name: "比較型", sub: "看差異/優缺點", icon: "fa-scale-unbalanced" },
+        { name: "流程型", sub: "看步驟/順序", icon: "fa-diagram-next" },
+        { name: "時間軸", sub: "看事件先後", icon: "fa-timeline" },
+        { name: "比例圖", sub: "看部分與整體占比", icon: "fa-chart-pie" },
+        { name: "地圖型", sub: "看位置與區域分布", icon: "fa-map-location-dot" },
+        { name: "統計圖", sub: "看數據大小與趨勢", icon: "fa-chart-line" }
+      ];
+
+      return `
+        <div class="space-y-4">
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-teal-950/60 border border-emerald-500/30">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-emerald-300 uppercase tracking-wider"><i class="fa-solid fa-chart-pie mr-1"></i>實戰演練工坊 B</span>
+              <span class="text-xs font-bold text-amber-300">題目 ${state.chartMatcherIdx + 1} / ${CHART_SCENARIOS.length}</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-black text-white mt-1">資訊圖表選型決策器（先想問題，再選圖表）</h3>
+            <p class="text-xs text-slate-300 mt-0.5">根據教材單元 4-1 與 5-1：請閱讀下方任務情境，選出最能精準傳達資訊的圖表類型！</p>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-slate-900 border border-slate-700 space-y-2">
+            <div class="text-xs font-bold text-indigo-400"><i class="fa-solid fa-circle-question mr-1"></i>設計任務情境：</div>
+            <div class="text-sm sm:text-base font-black text-white leading-snug">${item.scenario}</div>
+            <div class="text-xs text-slate-400">💡 思考線索：${item.hint}</div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            ${types.map((t) => `
+              <button onclick="checkChartMatch('${t.name}')"
+                class="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-indigo-950/60 border border-slate-700 hover:border-indigo-400 text-left transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <i class="fa-solid ${t.icon}"></i>
+                </div>
+                <div class="text-sm font-black text-white">${t.name}</div>
+                <div class="text-[11px] text-slate-400">${t.sub}</div>
+              </button>
+            `).join('')}
+          </div>
+
+          <div id="chart-match-feedback" class="hidden p-4 rounded-2xl border text-xs sm:text-sm font-bold"></div>
+        </div>
+      `;
+    }
+
+    function checkChartMatch(selected) {
+      const item = CHART_SCENARIOS[state.chartMatcherIdx];
+      const fb = document.getElementById('chart-match-feedback');
+      if (!fb) return;
+
+      fb.classList.remove('hidden');
+      if (selected === item.correct) {
+        fb.className = 'p-4 rounded-2xl border bg-emerald-950/60 border-emerald-500/50 text-emerald-200 text-xs sm:text-sm space-y-2';
+        fb.innerHTML = `
+          <div class="font-black text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i>配對成功！+30 XP</div>
+          <div>${item.exp}</div>
+          <button onclick="nextChartScenario()" class="mt-2 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black">
+            下一題情境挑戰 <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        `;
+        awardXP(30, "圖表選型正確！", `成功掌握「${item.correct}」的應用情境`);
+      } else {
+        fb.className = 'p-4 rounded-2xl border bg-rose-950/60 border-rose-500/50 text-rose-200 text-xs sm:text-sm';
+        fb.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1 text-rose-400"></i>再想一下喔！「${selected}」不是最適合此情境的圖表，請看上方思考線索再試一次！`;
+      }
+    }
+
+    function nextChartScenario() {
+      state.chartMatcherIdx = (state.chartMatcherIdx + 1) % CHART_SCENARIOS.length;
+      refreshActiveLabViews();
+    }
+
+    // LAB 3: Interactive Card Final Check & Inspector (Units 5-2, 6-1, 7-2, 9-2)
+    function getCardInspectorHTML() {
+      const fixes = state.cardInspectorFixes;
+      const fixCount = Object.values(fixes).filter(Boolean).length;
+      const score = Math.round((fixCount / 6) * 100);
+
+      return `
+        <div class="space-y-4">
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-950/80 to-rose-950/60 border border-amber-500/30">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-amber-300 uppercase tracking-wider"><i class="fa-solid fa-magnifying-glass-chart mr-1"></i>實戰演練工坊 C</span>
+              <span class="text-xs font-black px-2.5 py-0.5 rounded-full ${score === 100 ? 'bg-emerald-500 text-white' : 'bg-amber-500/20 text-amber-300'}">完稿品質得分：${score} / 100</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-black text-white mt-1">圖卡完稿互動診斷室（初稿 V1 ➔ 滿分完稿）</h3>
+            <p class="text-xs text-slate-300 mt-0.5">下方是一張犯了新手常見錯誤的 AI 初稿圖卡。請點擊左方 6 個「人工編修與完稿檢查開關」，親眼見證圖卡蛻變！</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <!-- Left 6 Fix Toggles -->
+            <div class="lg:col-span-5 space-y-2">
+              ${[
+                { key: 'title', label: '1. 修正主標題（短、準、明確）', sub: '將模糊標題改為 12 字內具體主題' },
+                { key: 'contrast', label: '2. 強化色彩對比（避免亮底淺字）', sub: '修正刺眼撞色，建立深淺高對比' },
+                { key: 'hierarchy', label: '3. 刪減冗長文字與重整層級', sub: '長段改為動詞開頭短句，創造留白' },
+                { key: 'icons', label: '4. 統一圖示風格（Icon 一致性）', sub: '替換雜亂符號，統一使用簡潔圖示' },
+                { key: 'source', label: '5. 補上可追溯之引用來源與單位', sub: '拒寫「網路資料」，標明機構與年份' },
+                { key: 'cta', label: '6. 加入具體可執行的行動提示 (CTA)', sub: '將「請多思考」改為具體生活任務' }
+              ].map((item) => `
+                <button onclick="toggleCardFix('${item.key}')"
+                  class="w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 ${
+                    fixes[item.key]
+                      ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-200'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300'
+                  }">
+                  <div>
+                    <div class="text-xs font-black">${item.label}</div>
+                    <div class="text-[11px] opacity-75">${item.sub}</div>
+                  </div>
+                  <div class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${fixes[item.key] ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}">
+                    <i class="fa-solid ${fixes[item.key] ? 'fa-check' : 'fa-wrench'} text-xs"></i>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+
+            <!-- Right Live Simulated Card Preview -->
+            <div class="lg:col-span-7">
+              <div class="rounded-2xl p-5 border-2 transition-all duration-300 ${
+                fixes.contrast
+                  ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border-indigo-400/60 text-white shadow-xl'
+                  : 'bg-yellow-200 border-red-400 text-yellow-600'
+              }">
+                <!-- Top Badge -->
+                <div class="flex items-center justify-between text-[11px] font-bold mb-2">
+                  <span class="${fixes.contrast ? 'px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300' : 'text-yellow-500'}">
+                    校園永續生活知識卡
+                  </span>
+                  <span class="px-2 py-0.5 rounded font-black ${score === 100 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}">
+                    ${score === 100 ? '✔ 完美定稿 V3' : '⚠ 待修正初稿 V1'}
+                  </span>
+                </div>
+
+                <!-- 1. Main Title & 2. Subtitle -->
+                <div class="mb-3">
+                  <h4 class="${fixes.title ? 'text-xl sm:text-2xl font-black tracking-tight' : 'text-sm font-normal underline'} ${fixes.contrast ? 'text-white' : 'text-yellow-500'}">
+                    ${fixes.title ? '校園減塑的 3 個實用習慣' : '關於一些大家在學校裡非常重要而且一定要知道的事情分享'}
+                  </h4>
+                  <p class="text-xs mt-1 ${fixes.contrast ? 'text-indigo-200' : 'text-yellow-500'}">
+                    ${fixes.title ? '從日常飲水、餐盒使用與自備提袋開始改變生態' : '這是一張講述很多事情的圖卡希望大家喜歡'}
+                  </p>
+                </div>
+
+                <!-- 3. Key Sentence -->
+                <div class="p-2.5 rounded-xl mb-3 text-xs font-bold ${
+                  fixes.contrast
+                    ? 'bg-indigo-500/25 border border-indigo-400/40 text-amber-300'
+                    : 'bg-yellow-100 border border-yellow-300 text-yellow-500'
+                }">
+                  <i class="fa-solid fa-lightbulb mr-1"></i>重點句：每天少用一個一次性塑膠袋，每年可為海洋減少數百件塑膠垃圾！
+                </div>
+
+                <!-- 4. Body Points & Icons -->
+                <div class="space-y-2 mb-4">
+                  ${fixes.hierarchy ? `
+                    <div class="flex items-center gap-2.5 p-2 rounded-lg ${fixes.contrast ? 'bg-slate-800/70' : 'bg-yellow-100'}">
+                      <span class="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0">
+                        <i class="fa-solid ${fixes.icons ? 'fa-bottle-water' : 'fa-ghost'}"></i>
+                      </span>
+                      <span class="text-xs font-bold">1. 自備環保水杯：減少購買瓶裝水與手搖飲塑膠杯（占比達 42%）。</span>
+                    </div>
+                    <div class="flex items-center gap-2.5 p-2 rounded-lg ${fixes.contrast ? 'bg-slate-800/70' : 'bg-yellow-100'}">
+                      <span class="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0">
+                        <i class="fa-solid ${fixes.icons ? 'fa-utensils' : 'fa-Snowman'}"></i>
+                      </span>
+                      <span class="text-xs font-bold">2. 使用重複餐具：外帶午餐自備不鏽鋼便當盒與環保筷。</span>
+                    </div>
+                    <div class="flex items-center gap-2.5 p-2 rounded-lg ${fixes.contrast ? 'bg-slate-800/70' : 'bg-yellow-100'}">
+                      <span class="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0">
+                        <i class="fa-solid ${fixes.icons ? 'fa-bag-shopping' : 'fa-jet-fighter'}"></i>
+                      </span>
+                      <span class="text-xs font-bold">3. 拒絕過度包裝：隨身攜帶摺疊環保袋，落實源頭減量。</span>
+                    </div>
+                  ` : `
+                    <p class="text-[11px] leading-tight">
+                      我們在學校裡面每天都會買很多飲料跟便當，然後就會產生非常非常多的塑膠垃圾，像是塑膠袋啊、吸管啊、免洗筷跟飲料杯（約42），如果不去處理的話海洋裡面的海龜就會吃到塑膠袋非常可憐，所以我們應該要試著帶環保杯跟環保餐具去買飯，不要再用那麼多塑膠製品了喔！
+                    </p>
+                  `}
+                </div>
+
+                <!-- 5. Source & 6. CTA -->
+                <div class="pt-2.5 border-t ${fixes.contrast ? 'border-slate-700/80' : 'border-yellow-300'} flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                  <div class="${fixes.contrast ? 'text-slate-400' : 'text-yellow-500'}">
+                    <i class="fa-solid fa-link mr-1"></i>${fixes.source ? '資料來源：環境部資源循環署 (2025) 校園減塑統計報告' : '資料來源：網路資料'}
+                  </div>
+                  <div class="px-2.5 py-1 rounded-lg font-black ${
+                    fixes.cta
+                      ? 'bg-emerald-500 text-slate-950'
+                      : 'bg-yellow-300 text-yellow-600'
+                  }">
+                    <i class="fa-solid fa-person-running mr-1"></i>${fixes.cta ? '行動提示：記錄你今天少用了幾個塑膠袋！' : '行動提示：請大家多多思考！'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleCardFix(key) {
+      state.cardInspectorFixes[key] = !state.cardInspectorFixes[key];
+      if (state.cardInspectorFixes[key]) {
+        awardXP(20, "完成一項人工精修！", "落實完稿前品質把關");
+      }
+      refreshActiveLabViews();
+    }
+
+    function refreshActiveLabViews() {
+      const island = ISLANDS_DATA.find((x) => x.id === state.activeIslandId);
+      if (island && state.activeDrawerTab === 'lab') {
+        renderDrawerBody(island);
+      }
+      const modal = document.getElementById('global-lab-modal');
+      if (!modal.classList.contains('hidden')) {
+        switchGlobalLabTab(currentGlobalLabTab);
+      }
+    }
+
+    /********************************************************************
+     * 8. ISLAND CHALLENGE QUIZ & MASTERY SYSTEM
+     ********************************************************************/
+    function renderQuizInsideContainer(container, island) {
+      const allAnsweredCorrect = island.quiz.every(
+        (q, idx) => state.quizAnswers[`${island.id}-${idx}`] === q.ans
+      );
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/90 to-purple-950/80 border border-indigo-500/40 flex items-center justify-between">
+            <div>
+              <span class="text-xs font-black text-amber-300 uppercase"><i class="fa-solid fa-trophy mr-1"></i>島嶼認證挑戰</span>
+              <h3 class="text-base sm:text-lg font-black text-white mt-0.5">${island.name}｜實戰觀念測驗</h3>
+              <p class="text-xs text-slate-300 mt-0.5">全部答對即可點亮本島嶼徽章並獲得 +150 XP 獎勵！</p>
+            </div>
+            ${allAnsweredCorrect ? `
+              <div class="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400 text-emerald-300 text-xs font-black shrink-0">
+                <i class="fa-solid fa-medal mr-1"></i>已通關！
+              </div>
+            ` : ''}
+          </div>
+
+          ${island.quiz.map((qItem, qIdx) => {
+            const key = `${island.id}-${qIdx}`;
+            const chosen = state.quizAnswers[key];
+            const isAnswered = chosen !== undefined;
+            const isCorrect = chosen === qItem.ans;
+
+            return `
+              <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/85 border border-slate-800 space-y-3">
+                <div class="text-xs font-black text-indigo-400">問題 0${qIdx + 1}</div>
+                <h4 class="text-sm sm:text-base font-bold text-white leading-snug">${qItem.q}</h4>
+                <div class="space-y-2 pt-1">
+                  ${qItem.options.map((opt, oIdx) => {
+                    let btnStyle = 'bg-slate-950/80 border-slate-800 hover:border-indigo-400 text-slate-200';
+                    if (isAnswered) {
+                      if (oIdx === qItem.ans) {
+                        btnStyle = 'bg-emerald-950/70 border-emerald-500 text-emerald-200 font-bold';
+                      } else if (oIdx === chosen && !isCorrect) {
+                        btnStyle = 'bg-rose-950/70 border-rose-500 text-rose-200';
+                      }
+                    }
+                    return `
+                      <button onclick="submitQuizAnswer(${island.id}, ${qIdx}, ${oIdx})"
+                        class="w-full p-3 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-start gap-2.5 ${btnStyle}">
+                        <span class="w-5 h-5 rounded-md bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                          ${['A', 'B', 'C', 'D'][oIdx]}
+                        </span>
+                        <span class="flex-1">${opt}</span>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+
+                ${isAnswered ? `
+                  <div class="p-3.5 rounded-xl text-xs sm:text-sm leading-relaxed ${
+                    isCorrect
+                      ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-200'
+                      : 'bg-rose-950/40 border border-rose-500/40 text-rose-200'
+                  }">
+                    <div class="font-black mb-1">
+                      <i class="fa-solid ${isCorrect ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-rose-400'} mr-1"></i>
+                      ${isCorrect ? '回答正確！' : '這題再看一次解析，點擊正確選項即可完成訂正：'}
+                    </div>
+                    <div>${qItem.exp}</div>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function submitQuizAnswer(islandId, qIdx, optionIdx) {
+      const island = ISLANDS_DATA.find((x) => x.id === islandId);
+      if (!island) return;
+
+      const key = `${islandId}-${qIdx}`;
+      state.quizAnswers[key] = optionIdx;
+
+      if (optionIdx === island.quiz[qIdx].ans) {
+        awardXP(50, "測驗答對！", `完成第 ${islandId} 島第 ${qIdx + 1} 題`);
+      }
+
+      // Check if all questions on this island are answered correctly
+      const allCorrect = island.quiz.every(
+        (q, i) => state.quizAnswers[`${islandId}-${i}`] === q.ans
+      );
+
+      if (allCorrect && !state.masteredIslands.has(islandId)) {
+        state.masteredIslands.add(islandId);
+        awardXP(150, `恭喜精通「${island.name}」！`, "已點亮島嶼完成徽章");
+        updateIslandMasteryVisuals(islandId);
+        renderDrawerHeader(island);
+        renderBottomDock();
+      }
+
+      renderDrawerBody(island);
+    }
+
+    function updateIslandMasteryVisuals(islandId) {
+      // Update 3D ring glow to bright emerald/gold
+      const grp = islandGroups[islandId];
+      if (grp && grp.userData.ringMesh) {
+        grp.userData.ringMesh.material.color.setHex(0x34d399);
+        grp.userData.ringMesh.material.opacity = 0.9;
+      }
+      // Show checkmark on floating 3D HTML label
+      const checkIcon = document.getElementById(`label-check-${islandId}`);
+      if (checkIcon) checkIcon.classList.remove('hidden');
+
+      // Update top HUD mastery bar
+      const count = state.masteredIslands.size;
+      document.getElementById('mastery-counter').textContent = `${count} / ${ISLANDS_DATA.length} 島`;
+      document.getElementById('mastery-bar').style.width = `${(count / ISLANDS_DATA.length) * 100}%`;
+    }
+
+    function awardXP(amount, title, desc) {
+      state.xp += amount;
+      document.getElementById('xp-counter').textContent = `${state.xp} XP`;
+      showToast(title, `+${amount} XP｜${desc}`);
+    }
+
+    let toastTimeout;
+    function showToast(title, desc) {
+      const box = document.getElementById('toast-box');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-desc').textContent = desc;
+      box.classList.remove('translate-x-[150%]');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        box.classList.add('translate-x-[150%]');
+      }, 3000);
+    }
+
+    /********************************************************************
+     * 9. GLOBAL WORKSHOP MODAL CONTROLS
+     ********************************************************************/
+    let currentGlobalLabTab = 'prompt';
+
+    function openGlobalLabModal() {
+      stopAutoTour();
+      const modal = document.getElementById('global-lab-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      switchGlobalLabTab(currentGlobalLabTab);
+    }
+
+    function closeGlobalLabModal() {
+      const modal = document.getElementById('global-lab-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function switchGlobalLabTab(tab) {
+      currentGlobalLabTab = tab;
+      ['prompt', 'chart', 'inspector'].forEach((t) => {
+        const btn = document.getElementById(`glab-tab-${t}`);
+        if (t === tab) {
+          btn.className = 'px-4 py-2.5 rounded-t-xl font-bold text-xs sm:text-sm border-b-2 border-indigo-400 text-indigo-300 bg-slate-800/80 flex items-center gap-2 shrink-0';
+        } else {
+          btn.className = 'px-4 py-2.5 rounded-t-xl font-bold text-xs sm:text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 shrink-0';
+        }
+      });
+      const body = document.getElementById('global-lab-body');
+      renderMiniLabInsideContainer(body, tab);
+    }
+
+    /********************************************************************
+     * 10. INITIALIZE ON WINDOW LOAD
+     ********************************************************************/
+    window.onload = function () {
+      renderBottomDock();
+      initThreeScene();
+    };
+  </script>
+<dialog id="passport" class="glass-panel"><div class="passport-heading"><h2><i class="fa-solid fa-address-book"></i> 學習護照</h2><button onclick="document.getElementById('passport').close()" class="glass-pill" aria-label="關閉學習護照">關閉 ✕</button></div><div id="passport-content"></div></dialog>
+<script src="./assets/supplement.js"></script><script src="./assets/enhance.js"></script>
+</body>
+</html>
